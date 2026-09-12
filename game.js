@@ -487,6 +487,9 @@
   }
 
   function startLevel(level, keepScore) {
+    // Banked here rather than at each call site, so no entry point can drop a
+    // run's score on the floor (restarting mid-game used to).
+    saveBest();
     S.level = Math.max(0, Math.min(C.MAX_LEVEL, level));
     S.board = C.seedLevel(S.level);
     if (!keepScore) S.score = 0;
@@ -597,7 +600,7 @@
       S.piece = moved;
       S.lockPending = false;
       S.lockTimer = 0;
-      if (S.softDrop) S.score += 1;
+      if (S.softDrop) { S.score += 1; refreshHUD(); }
       return true;
     }
     S.lockPending = true;
@@ -746,6 +749,7 @@
 
   boardCv.addEventListener('pointerdown', function (e) {
     if (!playing()) return;
+    if (gesture) return; // a stray second finger must not re-anchor the drag
     e.preventDefault();
     try { boardCv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     gesture = {

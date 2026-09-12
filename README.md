@@ -69,12 +69,15 @@ The rules live in [`core.js`](core.js) as pure functions over a board array,
 with no DOM access, so they can be tested directly:
 
 ```sh
-node test/core.test.js
+node test/core.test.js   # board rules
+node test/smoke.test.js  # boots the real game.js against a stubbed DOM and plays it
 ```
 
-That covers match detection, coupler splitting, gravity, cascades, rotation
-kicks, and level seeding. [`game.js`](game.js) holds only rendering, input, and
-the state machine.
+The first covers match detection, coupler splitting, gravity, cascades, rotation
+kicks, and level seeding. The second stubs enough DOM and canvas for
+[`game.js`](game.js) to run headlessly, then drives it with a greedy player that
+clears levels — so wiring and state-machine regressions get caught without a
+browser. Both run on every push.
 
 | File | What's in it |
 | --- | --- |
