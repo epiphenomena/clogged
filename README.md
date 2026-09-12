@@ -77,7 +77,8 @@ The first covers match detection, coupler splitting, gravity, cascades, rotation
 kicks, and level seeding. The second stubs enough DOM and canvas for
 [`game.js`](game.js) to run headlessly, then drives it with a greedy player that
 clears levels — so wiring and state-machine regressions get caught without a
-browser. Both run on every push.
+browser. Both are plain node scripts with no dependencies; run them before you
+push.
 
 | File | What's in it |
 | --- | --- |
@@ -88,12 +89,14 @@ browser. Both run on every push.
 
 ## Deploying
 
-Pushing to `main` runs the tests and publishes the repo root to GitHub Pages via
-[`.github/workflows/pages.yml`](.github/workflows/pages.yml). Enable it once
-under **Settings → Pages → Source → GitHub Actions**.
+The repo root is the site — there is nothing to build. Under
+**Settings → Pages → Source**, choose **Deploy from a branch** and pick `main`
+with the `/ (root)` folder. Every push to `main` then republishes it.
 
-Every path in the app is relative and the manifest's `start_url` is `./`, so it
-also works from a subdirectory or any static host.
+The `.nojekyll` file keeps Pages from running the site through Jekyll. Every
+path in the app is relative and the manifest's `start_url` is `./`, so it works
+from a project subpath like `/clogged/` as happily as from a domain root, or
+from any other static host.
 
 ## License
 
