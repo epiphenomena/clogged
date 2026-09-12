@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Clogged</title>
+<meta name="description" content="Clogged — drop couplers down the pipe and line up four of a colour to dissolve the grime.">
+<meta name="theme-color" content="#0b0e1a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Clogged">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app">
+  <header id="hud">
+    <div class="stats">
+      <div class="stat"><span class="stat-label">Score</span><span class="stat-value" id="hud-score">0</span></div>
+      <div class="stat"><span class="stat-label">Best</span><span class="stat-value" id="hud-best">0</span></div>
+      <div class="stat"><span class="stat-label">Level</span><span class="stat-value" id="hud-level">0</span></div>
+      <div class="stat"><span class="stat-label">Grime</span><span class="stat-value" id="hud-clogs">0</span></div>
+    </div>
+    <div class="hud-right">
+      <div id="next-wrap"><span class="stat-label">Next</span><canvas id="next" width="112" height="56"></canvas></div>
+      <div class="hud-buttons">
+        <button id="btn-mute" class="icon-btn" aria-label="Toggle sound" aria-pressed="false">🔊</button>
+        <button id="btn-pause" class="icon-btn" aria-label="Pause">⏸</button>
+      </div>
+    </div>
+  </header>
+
+  <section id="playfield">
+    <canvas id="board" aria-label="Pipe"></canvas>
+  </section>
+
+  <section id="controls" aria-label="Game controls">
+    <button class="ctl" id="ctl-left" aria-label="Move left">◀</button>
+    <button class="ctl ctl-rot" id="ctl-ccw" aria-label="Rotate counter-clockwise">⟲</button>
+    <button class="ctl ctl-drop" id="ctl-down" aria-label="Drop">▼</button>
+    <button class="ctl ctl-rot" id="ctl-cw" aria-label="Rotate clockwise">⟳</button>
+    <button class="ctl" id="ctl-right" aria-label="Move right">▶</button>
+  </section>
+  <p id="kbd-hint">
+    <span class="hint-touch">Drag the pipe to steer · tap to rotate · flick down to drop</span>
+    <span class="hint-keys">← → move · ↓ drop · Z / X rotate · Space slam · P pause</span>
+  </p>
+</main>
+
+<div class="overlay" id="ov-menu">
+  <div class="panel">
+    <h1 class="title">CLOGGED</h1>
+    <p class="tagline">Grime is choking the pipe.<br>Line up four of a colour to dissolve it.</p>
+    <div class="best-line" id="menu-best">Best: 0</div>
+    <div class="level-picker">
+      <button class="mini-btn" id="lv-down" aria-label="Lower level">−</button>
+      <div class="level-readout"><span id="lv-num">Level 0</span><span id="lv-clogs">4 grime</span></div>
+      <button class="mini-btn" id="lv-up" aria-label="Raise level">+</button>
+    </div>
+    <button class="big-btn" id="btn-start">PLAY</button>
+    <p class="howto">Couplers stack up. Four in a row — across or down — flushes them away.</p>
+  </div>
+</div>
+
+<div class="overlay hidden" id="ov-pause">
+  <div class="panel">
+    <h2 class="subtitle">Paused</h2>
+    <button class="big-btn" id="btn-resume">RESUME</button>
+    <button class="ghost-btn" id="btn-restart">Restart level</button>
+    <button class="ghost-btn" id="btn-quit">Quit to menu</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="ov-clear">
+  <div class="panel">
+    <h2 class="subtitle good">Pipe clear!</h2>
+    <p class="result-line" id="clear-info">Level 0 flushed</p>
+    <button class="big-btn" id="btn-next-level">NEXT LEVEL</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="ov-gameover">
+  <div class="panel">
+    <h2 class="subtitle bad">Backed up</h2>
+    <p class="result-line" id="go-score">Score: 0</p>
+    <p class="best-line" id="go-best"></p>
+    <button class="big-btn" id="btn-retry">TRY AGAIN</button>
+    <button class="ghost-btn" id="btn-menu">Menu</button>
+  </div>
+</div>
+
+<script src="core.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

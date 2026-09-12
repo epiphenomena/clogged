@@ -1,0 +1,339 @@
+/*
+ * Clogged — pure game core.
+ * No DOM, no globals beyond the export. Everything here is a plain function
+ * over a board array so it can be unit-tested in node (see test/core.test.js).
+ *
+ * A board is a flat array of W*H slots. Each slot is null or:
+ *   { color: 0|1|2, type: 'clog'|'segment', link: 'left'|'right'|'up'|'down'|null }
+ * `link` points at the other half of a coupler. Clogs never move; segments fall.
+ * When one half of a coupler is dissolved the survivor's link is cleared, which
+ * turns it into a free single that falls on its own.
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.Core = api;
+})(typeof self !== 'undefined' ? self : globalThis, function () {
+  'use strict';
+
+  var W = 8;
+  var H = 16;
+  var COLORS = 3;
+  var MIN_RUN = 4;
+  var MAX_LEVEL = 20;
+  var SEED_TOP_ROW = 5; // grime never spawns above this row
+
+  var DIRS = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
+  var OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
+  // Orientation 0..3 = partner sits right / above / left / below the anchor.
+  var OFFSETS = [[1, 0], [0, -1], [-1, 0], [0, 1]];
+  var LINKS = ['right', 'up', 'left', 'down'];
+
+  function idx(c, r) { return r * W + c; }
+  function colOf(i) { return i % W; }
+  function rowOf(i) { return (i / W) | 0; }
+  function inBounds(c, r) { return c >= 0 && c < W && r >= 0 && r < H; }
+
+  function makeBoard() { return new Array(W * H).fill(null); }
+
+  function cellAt(board, c, r) {
+    return inBounds(c, r) ? board[idx(c, r)] : null;
+  }
+
+  function partnerIndex(i, link) {
+    if (!link) return -1;
+    var d = DIRS[link];
+    var c = colOf(i) + d[0];
+    var r = rowOf(i) + d[1];
+    return inBounds(c, r) ? idx(c, r) : -1;
+  }
+
+  /* ---------------------------------------------------------------- matching */
+
+  // Every cell belonging to a run of `min` or more same-coloured cells,
+  // scanned across and down. A cell in both directions is reported once.
+  function findMatches(board, min) {
+    min = min || MIN_RUN;
+    var hits = new Set();
+    var r, c, run, i;
+
+    for (r = 0; r < H; r++) {
+      run = 1;
+      for (c = 1; c <= W; c++) {
+        var a = board[idx(c - 1, r)];
+        var b = c < W ? board[idx(c, r)] : null;
+        if (a && b && a.color === b.color) {
+          run++;
+        } else {
+          if (a && run >= min) for (i = 0; i < run; i++) hits.add(idx(c - 1 - i, r));
+          run = 1;
+        }
+      }
+    }
+    for (c = 0; c < W; c++) {
+      run = 1;
+      for (r = 1; r <= H; r++) {
+        var u = board[idx(c, r - 1)];
+        var d = r < H ? board[idx(c, r)] : null;
+        if (u && d && u.color === d.color) {
+          run++;
+        } else {
+          if (u && run >= min) for (i = 0; i < run; i++) hits.add(idx(c, r - 1 - i));
+          run = 1;
+        }
+      }
+    }
+    return hits;
+  }
+
+  // Removes every hit cell, orphaning the surviving half of any broken coupler.
+  function clearMatches(board, hits) {
+    var clogs = 0, segments = 0;
+    hits.forEach(function (i) {
+      var cell = board[i];
+      if (!cell) return;
+      if (cell.type === 'clog') clogs++; else segments++;
+    });
+    hits.forEach(function (i) {
+      var cell = board[i];
+      if (!cell || !cell.link) return;
+      var p = partnerIndex(i, cell.link);
+      if (p >= 0 && board[p] && !hits.has(p)) board[p].link = null;
+    });
+    hits.forEach(function (i) { board[i] = null; });
+    return { clogs: clogs, segments: segments };
+  }
+
+  /* ---------------------------------------------------------------- gravity */
+
+  // Drops every unsupported segment by exactly one row. Coupler halves move as
+  // a unit: a pair only falls if both destinations are free. Returns true if
+  // anything moved, so the caller can animate one row per tick.
+  function gravityStep(board) {
+    var settledInto = new Set();
+    var any = false;
+
+    for (var r = H - 2; r >= 0; r--) {
+      for (var c = 0; c < W; c++) {
+        var i = idx(c, r);
+        var cell = board[i];
+        if (!cell || cell.type !== 'segment' || settledInto.has(i)) continue;
+
+        var group = [i];
+        if (cell.link) {
+          var p = partnerIndex(i, cell.link);
+          if (p >= 0 && board[p]) group.push(p);
+        }
+        if (group.length > 1 && settledInto.has(group[1])) continue;
+
+        var ok = true;
+        for (var g = 0; g < group.length; g++) {
+          var gc = colOf(group[g]);
+          var gr = rowOf(group[g]);
+          if (gr + 1 >= H) { ok = false; break; }
+          var target = idx(gc, gr + 1);
+          if (board[target] && group.indexOf(target) === -1) { ok = false; break; }
+        }
+        if (!ok) continue;
+
+        group.sort(function (a, b) { return b - a; }); // bottom-most first
+        for (var k = 0; k < group.length; k++) {
+          var from = group[k];
+          var to = idx(colOf(from), rowOf(from) + 1);
+          board[to] = board[from];
+          board[from] = null;
+          settledInto.add(to);
+        }
+        any = true;
+      }
+    }
+    return any;
+  }
+
+  function settle(board) {
+    var steps = 0;
+    while (gravityStep(board)) steps++;
+    return steps;
+  }
+
+  // Full clear/gravity cascade, used by tests and headless simulation.
+  // The live game runs the same sequence one animated step at a time.
+  function resolve(board) {
+    var chain = 0, clogs = 0, segments = 0;
+    for (;;) {
+      var hits = findMatches(board);
+      if (hits.size === 0) break;
+      chain++;
+      var got = clearMatches(board, hits);
+      clogs += got.clogs;
+      segments += got.segments;
+      settle(board);
+    }
+    return { chain: chain, clogs: clogs, segments: segments };
+  }
+
+  /* ---------------------------------------------------------------- pieces */
+
+  function pieceCells(p) {
+    var off = OFFSETS[p.orient];
+    var link = LINKS[p.orient];
+    return [
+      { c: p.c, r: p.r, color: p.colors[0], link: link },
+      { c: p.c + off[0], r: p.r + off[1], color: p.colors[1], link: OPPOSITE[link] }
+    ];
+  }
+
+  function canPlace(board, cells) {
+    for (var i = 0; i < cells.length; i++) {
+      var cell = cells[i];
+      if (!inBounds(cell.c, cell.r)) return false;
+      if (board[idx(cell.c, cell.r)]) return false;
+    }
+    return true;
+  }
+
+  function fits(board, p) { return canPlace(board, pieceCells(p)); }
+
+  function movedPiece(p, dc, dr, orient) {
+    return {
+      c: p.c + dc,
+      r: p.r + dr,
+      orient: orient === undefined ? p.orient : orient,
+      colors: p.colors
+    };
+  }
+
+  function tryMove(board, p, dc, dr) {
+    var next = movedPiece(p, dc, dr);
+    return fits(board, next) ? next : null;
+  }
+
+  // Rotation with wall/floor kicks so the piece still turns when it is flush
+  // against an edge or another stack.
+  var KICKS = [[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1], [-1, 1], [1, 1]];
+
+  function tryRotate(board, p, dir) {
+    var orient = (p.orient + (dir > 0 ? 1 : 3)) % 4;
+    for (var i = 0; i < KICKS.length; i++) {
+      var next = movedPiece(p, KICKS[i][0], KICKS[i][1], orient);
+      if (fits(board, next)) return next;
+    }
+    return null;
+  }
+
+  function dropDistance(board, p) {
+    var n = 0;
+    while (fits(board, movedPiece(p, 0, n + 1))) n++;
+    return n;
+  }
+
+  function lockPiece(board, p) {
+    var cells = pieceCells(p);
+    var written = [];
+    for (var i = 0; i < cells.length; i++) {
+      var cell = cells[i];
+      if (!inBounds(cell.c, cell.r)) continue;
+      var at = idx(cell.c, cell.r);
+      board[at] = { color: cell.color, type: 'segment', link: cell.link };
+      written.push(at);
+    }
+    // A half that landed out of bounds leaves its partner as a free single.
+    if (written.length === 1) board[written[0]].link = null;
+    return written;
+  }
+
+  function spawnPiece(colors) {
+    return { c: (W >> 1) - 1, r: 0, orient: 0, colors: colors };
+  }
+
+  function randomColors(rand) {
+    rand = rand || Math.random;
+    return [(rand() * COLORS) | 0, (rand() * COLORS) | 0];
+  }
+
+  /* ---------------------------------------------------------------- seeding */
+
+  // Longest same-colour run through (c,r) in either axis.
+  function runThrough(board, c, r) {
+    var cell = board[idx(c, r)];
+    if (!cell) return 0;
+    var best = 0;
+    var axes = [[1, 0], [0, 1]];
+    for (var a = 0; a < axes.length; a++) {
+      var dx = axes[a][0], dy = axes[a][1];
+      var n = 1, k;
+      for (k = 1; ; k++) {
+        var f = cellAt(board, c + dx * k, r + dy * k);
+        if (!f || f.color !== cell.color) break;
+        n++;
+      }
+      for (k = 1; ; k++) {
+        var b = cellAt(board, c - dx * k, r - dy * k);
+        if (!b || b.color !== cell.color) break;
+        n++;
+      }
+      if (n > best) best = n;
+    }
+    return best;
+  }
+
+  function clogCount(level) {
+    return Math.min(4 + level * 4, 64);
+  }
+
+  // Places grime so that no colour already sits 3-in-a-line — otherwise a level
+  // can cascade on its own the instant it opens.
+  function seedLevel(level, rand) {
+    rand = rand || Math.random;
+    var board = makeBoard();
+    var target = clogCount(level);
+    var slots = [];
+    for (var r = SEED_TOP_ROW; r < H; r++) {
+      for (var c = 0; c < W; c++) slots.push(idx(c, r));
+    }
+
+    var placed = 0;
+    var guard = slots.length * 200;
+    while (placed < target && guard-- > 0) {
+      var i = slots[(rand() * slots.length) | 0];
+      if (board[i]) continue;
+      var cc = colOf(i), rr = rowOf(i);
+      var order = [0, 1, 2];
+      for (var s = order.length - 1; s > 0; s--) {
+        var j = (rand() * (s + 1)) | 0;
+        var t = order[s]; order[s] = order[j]; order[j] = t;
+      }
+      for (var k = 0; k < order.length; k++) {
+        board[i] = { color: order[k], type: 'clog', link: null };
+        if (runThrough(board, cc, rr) < 3) { placed++; break; }
+        board[i] = null;
+      }
+    }
+    return board;
+  }
+
+  function countClogs(board) {
+    var n = 0;
+    for (var i = 0; i < board.length; i++) if (board[i] && board[i].type === 'clog') n++;
+    return n;
+  }
+
+  // Milliseconds per row of free fall.
+  function fallInterval(level) {
+    return Math.max(110, 760 - level * 34);
+  }
+
+  return {
+    W: W, H: H, COLORS: COLORS, MIN_RUN: MIN_RUN, MAX_LEVEL: MAX_LEVEL,
+    DIRS: DIRS, OFFSETS: OFFSETS, LINKS: LINKS, OPPOSITE: OPPOSITE,
+    idx: idx, colOf: colOf, rowOf: rowOf, inBounds: inBounds, cellAt: cellAt,
+    makeBoard: makeBoard, partnerIndex: partnerIndex,
+    findMatches: findMatches, clearMatches: clearMatches,
+    gravityStep: gravityStep, settle: settle, resolve: resolve,
+    pieceCells: pieceCells, canPlace: canPlace, fits: fits,
+    tryMove: tryMove, tryRotate: tryRotate, dropDistance: dropDistance,
+    lockPiece: lockPiece, spawnPiece: spawnPiece, randomColors: randomColors,
+    seedLevel: seedLevel, clogCount: clogCount, countClogs: countClogs,
+    runThrough: runThrough, fallInterval: fallInterval
+  };
+});
