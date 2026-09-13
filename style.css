@@ -9,6 +9,10 @@
   --muted: #8b95b4;
   --accent: #2dd4bf;
   --bad: #fb7185;
+  /* Chart surface and series colour, validated together for dark mode:
+     node scripts/validate_palette.js "#12a594" --mode dark --surface "#121a2e" */
+  --chart-surface: #121a2e;
+  --chart-series: #12a594;
   --radius: 14px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -242,3 +246,130 @@ body {
 /* While the flush or the sludge owns the screen, the HUD gets out of the way. */
 #hud { transition: opacity 0.35s ease; }
 body.fx-active #hud { opacity: 0; pointer-events: none; }
+
+/* ---------------------------------------------------------- score screen */
+
+/* The scores panel is taller than the rest; let it scroll rather than clip. */
+#ov-scores { align-items: flex-start; overflow-y: auto; }
+
+.panel-wide { max-width: 360px; margin: auto; }
+
+.score-section { margin-bottom: 18px; text-align: left; }
+
+.score-heading {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Chart surface — the colour the marks were validated against. */
+.chart-wrap {
+  position: relative;
+  padding: 8px 6px 4px;
+  background: var(--chart-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.chart-plot { position: relative; }
+.chart-plot:empty { display: none; }
+.chart-wrap svg { display: block; width: 100%; height: auto; touch-action: none; }
+
+.chart-empty, .score-empty {
+  margin: 0;
+  padding: 18px 4px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.chart-empty.hidden, .score-empty.hidden { display: none; }
+
+/* Tooltip: follows the touched point, never covers it. */
+.chart-tip {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -120%);
+  padding: 5px 9px;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  background: #0c1222;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.chart-tip.on { opacity: 1; }
+.chart-tip .tip-date { display: block; font-weight: 500; color: var(--muted); }
+
+.score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.score-table th {
+  padding: 0 0 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+
+.score-table th:first-child, .score-table td:first-child { text-align: left; width: 22px; }
+.score-table th:last-child, .score-table td:last-child { text-align: right; }
+
+.score-table td {
+  padding: 6px 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.score-table tbody tr:last-child td { border-bottom: 0; }
+.score-table .rank { color: var(--muted); font-weight: 700; }
+.score-table .score { font-weight: 800; }
+.score-table .when { color: var(--muted); font-size: 12px; }
+
+/* The current run, highlighted in the table it just entered. */
+.score-table tr.is-latest .score { color: var(--accent); }
+
+/* Screen-reader table view of the timeline; the chart itself is aria-hidden. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Chart text wears text tokens — never the series colour. */
+.chart-wrap .ax { fill: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+.chart-wrap .pt {
+  fill: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  /* A surface-coloured outline behind the glyphs, so a value label stays
+     readable wherever the line happens to run under it. */
+  paint-order: stroke;
+  stroke: var(--chart-surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}

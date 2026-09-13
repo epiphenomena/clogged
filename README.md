@@ -11,6 +11,7 @@ the level.
   <img src="docs/screenshot-menu.png" alt="The Clogged title screen" width="260">
   <img src="docs/screenshot.png" alt="A game in progress: couplings stacked above tangled hairballs" width="260">
   <img src="docs/screenshot-flush.png" alt="Clean water flushing down the pipe after a level is cleared" width="260">
+  <img src="docs/screenshot-scores.png" alt="The scores screen: a timeline of recent runs above an all-time top ten" width="260">
 </p>
 
 ## Playing
@@ -32,6 +33,20 @@ Three details make or break a plan:
 
 Chains multiply your score: each cascade step in a single landing doubles the
 multiplier, up to 16×.
+
+## Scores
+
+Every finished run is kept on the device — when you top out, quit mid-run, or
+restart a level. Clearing a level does not end a run, so a long climb is filed
+once, under its final score.
+
+**Scores** on the title screen shows two things: the last 25 runs plotted over
+time, and the all-time top ten with the level reached and the date. Touch the
+chart to read any run off it.
+
+Two lists are stored rather than one. The rolling window behind the chart keeps
+the 50 most recent runs, while the top ten is never evicted by age — so a great
+score from a hundred games ago still holds its place.
 
 ## Controls
 
@@ -81,20 +96,23 @@ The rules live in [`core.js`](core.js) as pure functions over a board array,
 with no DOM access, so they can be tested directly:
 
 ```sh
-node test/core.test.js   # board rules
-node test/smoke.test.js  # boots the real game.js against a stubbed DOM and plays it
+node test/core.test.js    # board rules
+node test/scores.test.js  # score history
+node test/smoke.test.js   # boots the real game.js against a stubbed DOM and plays it
 ```
 
 The first covers match detection, coupling splitting, gravity, cascades, rotation
-kicks, level seeding, and the pressure ramp. The second stubs enough DOM and
+kicks, level seeding, and the pressure ramp; the second covers recording, the two
+caps, ranking, and surviving junk in storage. The third stubs enough DOM and
 canvas for [`game.js`](game.js) to run headlessly, then drives it with a greedy
 player that clears levels — so wiring and state-machine regressions get caught
-without a browser. Both are plain node scripts with no dependencies; run them
-before you push.
+without a browser. All three are plain node scripts with no dependencies; run
+them before you push.
 
 | File | What's in it |
 | --- | --- |
 | `core.js` | Board rules — matching, gravity, cascades, seeding, speed |
+| `scores.js` | Score history — the rolling window and the all-time table |
 | `game.js` | Canvas rendering, gestures, game loop, scoring, effects |
 | `style.css` | Layout and theming, mobile-first |
 | `sw.js` | Offline fallback (see the caching note above) |

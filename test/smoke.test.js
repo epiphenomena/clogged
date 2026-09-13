@@ -65,6 +65,7 @@ function makeEl(id, rect) {
       rect || RECTS[id] || null),
     setPointerCapture: () => {},
     releasePointerCapture: () => {},
+    innerHTML: '',
     fire(type, ev = {}) {
       const fns = listeners.get(type) || [];
       for (const fn of fns) fn(Object.assign({ preventDefault() {}, stopPropagation() {} }, ev));
@@ -171,7 +172,9 @@ let rngState = Number(process.env.CLOGGED_SEED || 20260912) >>> 0;
 Math.random = () => ((rngState = (rngState * 1664525 + 1013904223) >>> 0) / 4294967296);
 
 global.self.Core = require(path.join(ROOT, 'core.js'));
+global.self.Scores = require(path.join(ROOT, 'scores.js'));
 const C = global.self.Core;
+const Sc = global.self.Scores;
 
 /* ------------------------------------------------------------------ boot */
 require(path.join(ROOT, 'game.js'));
@@ -512,6 +515,95 @@ tick(16);
 check('retry restarts at the same level', el('hud-level').textContent === '20',
   el('hud-level').textContent);
 check('retry clears the game-over overlay', !visible('ov-gameover'));
+
+/* ------------------------------------------------------------ score history */
+{
+  const saved = () => Sc.sanitize(JSON.parse(store.get('clogged.history') || 'null'));
+
+  // The losing run earlier in this test must have been filed exactly once.
+  const afterLoss = saved();
+  check('a finished run is recorded in history', afterLoss.runs.length > 0,
+    'runs=' + afterLoss.runs.length);
+  check('the recorded run has a score', afterLoss.runs.every((r) => r.s > 0));
+  check('the recorded run has a timestamp', afterLoss.runs.every((r) => r.t > 0));
+  check('the top table is populated', afterLoss.top.length > 0);
+  check('the best score matches the table top',
+    Sc.bestScore(afterLoss) === Number(store.get('clogged.best')),
+    Sc.bestScore(afterLoss) + ' vs ' + store.get('clogged.best'));
+
+  // Retrying after a game over must not file the same run a second time.
+  const countBefore = saved().runs.length;
+  el('btn-retry').fire('click');
+  tick(16);
+  check('retrying does not double-record the finished run',
+    saved().runs.length === countBefore,
+    countBefore + ' -> ' + saved().runs.length);
+
+  // Advancing a level continues the same run, so it must not be filed.
+  startAt(0);
+  const midRun = saved().runs.length;
+  const won = clearLevel(6);
+  check('a level was cleared for the history check', won && won.cleared);
+  el('btn-next-level').fire('click');
+  tick(16);
+  check('clearing a level does not end the run', saved().runs.length === midRun,
+    midRun + ' -> ' + saved().runs.length);
+
+  // Quitting mid-run banks it.
+  for (let i = 0; i < 30; i++) tick(16);
+  const beforeQuit = saved().runs.length;
+  const quitScore = Number(el('hud-score').textContent);
+  el('btn-pause').fire('click');
+  el('btn-quit').fire('click');
+  check('quitting mid-run records it', saved().runs.length === beforeQuit + 1,
+    beforeQuit + ' -> ' + saved().runs.length);
+  const last = saved().runs[saved().runs.length - 1];
+  check('the quit run kept its score', !!last && last.s === quitScore,
+    (last ? last.s : 'no run recorded') + ' vs ' + quitScore);
+
+  // Starting a fresh game from the menu must not re-file the quit run.
+  const beforeReplay = saved().runs.length;
+  el('btn-start').fire('click');
+  tick(16);
+  check('starting a new game does not re-record the last one',
+    saved().runs.length === beforeReplay,
+    beforeReplay + ' -> ' + saved().runs.length);
+}
+
+/* -------------------------------------------------------- score screen UI */
+{
+  el('btn-pause').fire('click');
+  el('btn-quit').fire('click');
+  check('the scores button is wired', el('btn-scores').listeners.has('click'));
+  el('btn-scores').fire('click');
+  check('the scores screen opens', visible('ov-scores'));
+  check('the menu is hidden behind it', !visible('ov-menu'));
+
+  const table = el('top-body').innerHTML;
+  check('the top table rendered rows', table.indexOf('<tr') === 0, table.slice(0, 60));
+  check('the top table shows a rank', table.indexOf('class="rank"') > 0);
+  check('the top table shows a score', table.indexOf('class="score"') > 0);
+
+  const chart = el('chart-plot').innerHTML;
+  check('the timeline rendered an svg', chart.indexOf('<svg') === 0, chart.slice(0, 40));
+  check('the timeline draws a line', chart.indexOf('stroke="var(--chart-series)"') > 0);
+  check('the timeline uses the validated series colour',
+    chart.indexOf('fill="var(--chart-series)"') > 0);
+  check('the timeline has an accessible table',
+    chart.indexOf('class="visually-hidden"') > 0 && chart.indexOf('<caption>') > 0);
+  check('the chart itself is hidden from screen readers',
+    chart.indexOf('aria-hidden="true"') > 0);
+  check('the timeline shows at most 25 points',
+    (chart.match(/<circle /g) || []).length <= 25,
+    String((chart.match(/<circle /g) || []).length));
+  check('the timeline labels sparingly, not every point',
+    (chart.match(/class="pt"/g) || []).length <= 2,
+    String((chart.match(/class="pt"/g) || []).length));
+
+  el('btn-scores-back').fire('click');
+  check('closing the scores screen returns to the menu', visible('ov-menu'));
+  check('the scores screen is closed', !visible('ov-scores'));
+}
 
 /* --------------------------------------------------------------- report */
 if (problems.length) {

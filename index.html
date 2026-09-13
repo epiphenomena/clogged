@@ -45,6 +45,7 @@
       <button class="mini-btn" id="lv-up" aria-label="Raise level">+</button>
     </div>
     <button class="big-btn" id="btn-start">PLAY</button>
+    <button class="ghost-btn" id="btn-scores">Scores</button>
     <ul class="howto">
       <li><b>Drag</b> the pipe to aim</li>
       <li><b>Tap</b> to spin · <b>swipe up</b> spins back</li>
@@ -77,11 +78,40 @@
     <p class="result-line" id="go-score">Score: 0</p>
     <p class="best-line" id="go-best"></p>
     <button class="big-btn" id="btn-retry">TRY AGAIN</button>
+    <button class="ghost-btn" id="btn-go-scores">Scores</button>
     <button class="ghost-btn" id="btn-menu">Menu</button>
   </div>
 </div>
 
+<div class="overlay hidden" id="ov-scores">
+  <div class="panel panel-wide">
+    <h2 class="subtitle">Scores</h2>
+
+    <section class="score-section">
+      <h3 class="score-heading">Last 25 runs</h3>
+      <div id="chart-wrap" class="chart-wrap">
+        <div id="chart-plot" class="chart-plot"></div>
+        <div id="chart-empty" class="chart-empty">No runs yet.</div>
+      </div>
+    </section>
+
+    <section class="score-section">
+      <h3 class="score-heading">Top 10 all time</h3>
+      <table class="score-table">
+        <thead>
+          <tr><th scope="col">#</th><th scope="col">Score</th><th scope="col">Level</th><th scope="col">When</th></tr>
+        </thead>
+        <tbody id="top-body"></tbody>
+      </table>
+      <p class="score-empty hidden" id="top-empty">Nothing here yet — finish a run to get on the board.</p>
+    </section>
+
+    <button class="big-btn" id="btn-scores-back">BACK</button>
+  </div>
+</div>
+
 <script src="core.js"></script>
+<script src="scores.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

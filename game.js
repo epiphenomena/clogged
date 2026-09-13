@@ -151,8 +151,14 @@
     fx: null,
     hint: 1,              // fades out once the player gets going
     locks: 0,
+    recorded: false,     // has the current run been filed into history yet
+    lastRunAt: 0,        // timestamp of the run just filed, for highlighting
+    scoresReturn: 'ov-menu',
     resumePhase: 'play'
   };
+
+  var Sc = self.Scores;
+  var history = Sc.seedBest(Sc.sanitize(Store.get('history', null)), S.best);
 
   var view = { cell: 24, wall: 7, collar: 13, grate: 11, x0: 0, y0: 0, vw: 0, vh: 0, dpr: 1, bg: null };
 
@@ -942,14 +948,26 @@
     }
   }
 
+  // A run ends when it tops out or when its score is about to be discarded.
+  // Recorded once, so retrying after a game over does not file it twice.
+  function endRun() {
+    saveBest();
+    if (S.score <= 0 || S.recorded) return;
+    S.recorded = true;
+    S.lastRunAt = Date.now();
+    history = Sc.add(history, { s: S.score, l: S.level, t: S.lastRunAt });
+    Store.set('history', history);
+  }
+
   function toast(text, color) {
     S.toast = { text: text, color: color, t: 0 };
   }
 
   function startLevel(level, keepScore) {
     // Banked here rather than at each call site, so no entry point can drop a
-    // run's score on the floor (restarting mid-game used to).
-    saveBest();
+    // run's score on the floor (restarting mid-game used to). Advancing a level
+    // keeps the same run going, so it must not file one.
+    if (!keepScore) { endRun(); S.recorded = false; }
     S.level = Math.max(0, Math.min(C.MAX_LEVEL, level));
     S.board = C.seedLevel(S.level);
     if (!keepScore) S.score = 0;
@@ -988,7 +1006,7 @@
 
   function gameOver() {
     S.phase = 'gameover';
-    saveBest();
+    endRun();
     $('go-score').textContent = 'Score: ' + S.score;
     $('go-best').textContent = 'Best: ' + S.best;
     refreshHUD();
@@ -998,7 +1016,7 @@
   function levelCleared() {
     S.phase = 'levelclear';
     S.score += 500 * (S.level + 1);
-    saveBest();
+    saveBest();  // mid-run: bank the best, but the run is not over
     refreshHUD();
     $('clear-info').textContent = S.level >= C.MAX_LEVEL
       ? 'Level ' + S.level + ' flushed — that is the last one!'
@@ -1305,6 +1323,223 @@
     }
   }
 
+  /* --------------------------------------------------------- score screen */
+
+  var VB_W = 304, VB_H = 132;            // chart viewBox, ~1:1 with CSS px
+  var PAD = { l: 38, r: 12, t: 14, b: 20 };
+  var chartPoints = [];                  // {x, y, run} in viewBox units
+
+  function esc(str) {
+    return String(str).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+  }
+
+  function fmtNum(n) {
+    try { return Number(n).toLocaleString(); } catch (e) { return String(n); }
+  }
+
+  function fmtDate(t) {
+    if (!t) return '—';
+    var d = new Date(t);
+    var sameYear = d.getFullYear() === new Date().getFullYear();
+    try {
+      return d.toLocaleDateString(undefined, sameYear
+        ? { month: 'short', day: 'numeric' }
+        : { month: 'short', day: 'numeric', year: '2-digit' });
+    } catch (e) { return d.toDateString(); }
+  }
+
+  function fmtWhen(t) {
+    if (!t) return '—';
+    var d = new Date(t);
+    try {
+      return fmtDate(t) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    } catch (e) { return fmtDate(t); }
+  }
+
+  // Round an axis maximum up to something a person would choose.
+  function niceMax(v) {
+    if (!(v > 0)) return 10;
+    var mag = Math.pow(10, Math.floor(Math.log10(v)));
+    var n = v / mag;
+    var step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+    return step * mag;
+  }
+
+  function renderTopTable(top) {
+    var body = $('top-body');
+    if (!top.length) {
+      body.innerHTML = '';
+      show('top-empty');
+      return;
+    }
+    hide('top-empty');
+    body.innerHTML = top.map(function (r, i) {
+      var mine = r.t && r.t === S.lastRunAt ? ' class="is-latest"' : '';
+      return '<tr' + mine + '>'
+        + '<td class="rank">' + (i + 1) + '</td>'
+        + '<td class="score">' + esc(fmtNum(r.s)) + '</td>'
+        + '<td>' + esc(r.l) + '</td>'
+        + '<td class="when">' + esc(fmtDate(r.t)) + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  // A single series over time: line plus dots, area wash, two direct labels.
+  // The marks carry the colour; every piece of text stays in a text token.
+  function renderTimeline(runs) {
+    var plot = $('chart-plot');
+    var empty = $('chart-empty');
+    chartPoints = [];
+
+    if (!runs.length) {
+      plot.innerHTML = '';
+      show('chart-empty');
+      return;
+    }
+    hide('chart-empty');
+
+    var x0 = PAD.l, x1 = VB_W - PAD.r, y0 = PAD.t, y1 = VB_H - PAD.b;
+    var plotW = x1 - x0, plotH = y1 - y0;
+    var peak = runs.reduce(function (m, r) { return Math.max(m, r.s); }, 0);
+    var top = niceMax(peak);
+    var yOf = function (v) { return y1 - (v / top) * plotH; };
+    var xOf = function (i) { return runs.length === 1 ? (x0 + x1) / 2 : x0 + (i / (runs.length - 1)) * plotW; };
+
+    var bestAt = 0;
+    runs.forEach(function (r, i) { if (r.s > runs[bestAt].s) bestAt = i; });
+
+    var pts = runs.map(function (r, i) {
+      var p = { x: xOf(i), y: yOf(r.s), run: r };
+      chartPoints.push(p);
+      return p;
+    });
+    var line = pts.map(function (p) { return p.x.toFixed(1) + ' ' + p.y.toFixed(1); }).join(' L ');
+
+    var svg = ['<svg viewBox="0 0 ' + VB_W + ' ' + VB_H + '" role="presentation" aria-hidden="true">'];
+
+    // gridlines and axis ticks — recessive, hairline, solid
+    [0, top / 2, top].forEach(function (v) {
+      var y = yOf(v);
+      svg.push('<line x1="' + x0 + '" y1="' + y.toFixed(1) + '" x2="' + x1 + '" y2="' + y.toFixed(1)
+        + '" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>');
+      svg.push('<text x="' + (x0 - 6) + '" y="' + (y + 3).toFixed(1)
+        + '" text-anchor="end" class="ax">' + esc(fmtNum(v)) + '</text>');
+    });
+
+    // area wash under the line, then the line itself
+    svg.push('<path d="M ' + pts[0].x.toFixed(1) + ' ' + y1 + ' L ' + line + ' L '
+      + pts[pts.length - 1].x.toFixed(1) + ' ' + y1 + ' Z" fill="var(--chart-series)" fill-opacity="0.1"/>');
+    svg.push('<path d="M ' + line + '" fill="none" stroke="var(--chart-series)" stroke-width="2"'
+      + ' stroke-linejoin="round" stroke-linecap="round"/>');
+
+    // crosshair, parked until a pointer arrives
+    svg.push('<line id="chart-cross" x1="0" y1="' + y0 + '" x2="0" y2="' + y1
+      + '" stroke="rgba(255,255,255,0.25)" stroke-width="1" opacity="0"/>');
+
+    // dots carry a 2px surface ring so they stay legible where they crowd
+    pts.forEach(function (p) {
+      svg.push('<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1)
+        + '" r="4" fill="var(--chart-series)" stroke="var(--chart-surface)" stroke-width="2"/>');
+    });
+
+    // Label the extreme and the endpoint only — never every point.
+    var last = pts.length - 1;
+    var label = function (i, text, below) {
+      var p = pts[i];
+      var anchor = p.x > x1 - 26 ? 'end' : (p.x < x0 + 26 ? 'start' : 'middle');
+      var y = below
+        ? Math.min(y1 - 3, p.y + 14)
+        : Math.max(y0 + 8, p.y - 9);
+      svg.push('<text x="' + p.x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="' + anchor
+        + '" class="pt">' + esc(text) + '</text>');
+    };
+    label(bestAt, fmtNum(runs[bestAt].s));   // the peak always has room above it
+    if (last !== bestAt) {
+      // If the line drops into the final point, a label above it lands on the
+      // line; put it underneath instead.
+      var descending = pts[last - 1] && pts[last - 1].y < pts[last].y;
+      label(last, fmtNum(runs[last].s), descending);
+    }
+
+    // x axis: just the span, oldest to newest
+    svg.push('<text x="' + x0 + '" y="' + (VB_H - 6) + '" text-anchor="start" class="ax">'
+      + esc(fmtDate(runs[0].t)) + '</text>');
+    if (runs.length > 1) {
+      svg.push('<text x="' + x1 + '" y="' + (VB_H - 6) + '" text-anchor="end" class="ax">'
+        + esc(fmtDate(runs[last].t)) + '</text>');
+    }
+    svg.push('</svg>');
+
+    // The chart is aria-hidden; this table is the accessible view of it.
+    var rows = runs.map(function (r, i) {
+      return '<tr><td>' + (i + 1) + '</td><td>' + esc(fmtWhen(r.t)) + '</td><td>'
+        + esc(fmtNum(r.s)) + '</td><td>' + esc(r.l) + '</td></tr>';
+    }).join('');
+
+    plot.innerHTML = svg.join('')
+      + '<div class="chart-tip" id="chart-tip"></div>'
+      + '<table class="visually-hidden"><caption>Last ' + runs.length
+      + ' runs</caption><thead><tr><th>Run</th><th>When</th><th>Score</th><th>Level</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table>';
+  }
+
+  function hideTip() {
+    var tip = $('chart-tip'), cross = document.getElementById('chart-cross');
+    if (tip) tip.classList.remove('on');
+    if (cross) cross.setAttribute('opacity', '0');
+  }
+
+  // Crosshair behaviour: snap to the nearest run rather than needing a
+  // direct hit, which matters when 25 dots share a phone-width axis.
+  function onChartPoint(e) {
+    if (!chartPoints.length) return;
+    var plot = $('chart-plot');
+    var rect = plot.getBoundingClientRect();
+    if (!rect.width) return;
+    var vx = ((e.clientX - rect.left) / rect.width) * VB_W;
+
+    var near = chartPoints[0], bestGap = Infinity;
+    for (var i = 0; i < chartPoints.length; i++) {
+      var gap = Math.abs(chartPoints[i].x - vx);
+      if (gap < bestGap) { bestGap = gap; near = chartPoints[i]; }
+    }
+
+    var tip = $('chart-tip');
+    var cross = document.getElementById('chart-cross');
+    if (cross) {
+      cross.setAttribute('x1', near.x);
+      cross.setAttribute('x2', near.x);
+      cross.setAttribute('opacity', '1');
+    }
+    if (tip) {
+      tip.innerHTML = esc(fmtNum(near.run.s)) + '<span class="tip-date">'
+        + esc(fmtWhen(near.run.t)) + ' · level ' + esc(near.run.l) + '</span>';
+      tip.style.left = ((near.x / VB_W) * 100).toFixed(2) + '%';
+      tip.style.top = ((near.y / VB_H) * 100).toFixed(2) + '%';
+      tip.classList.add('on');
+    }
+  }
+
+  function renderScores() {
+    renderTopTable(Sc.top(history));
+    renderTimeline(Sc.timeline(history));
+  }
+
+  function openScores(from) {
+    S.scoresReturn = from;
+    renderScores();
+    hide(from);
+    show('ov-scores');
+  }
+
+  function closeScores() {
+    hideTip();
+    hide('ov-scores');
+    show(S.scoresReturn || 'ov-menu');
+  }
+
   function updateLevelPicker() {
     $('lv-num').textContent = 'Level ' + S.startLevel;
     $('lv-clogs').textContent = C.clogCount(S.startLevel) + ' clogs';
@@ -1312,7 +1547,7 @@
   }
 
   function toMenu() {
-    saveBest();
+    endRun();
     S.phase = 'menu';
     S.piece = null;
     S.fx = null;
@@ -1357,6 +1592,22 @@
     hide('ov-gameover');
     startLevel(S.level, false);
   });
+
+  $('btn-scores').addEventListener('click', function () { openScores('ov-menu'); });
+  $('btn-go-scores').addEventListener('click', function () { openScores('ov-gameover'); });
+  $('btn-scores-back').addEventListener('click', closeScores);
+
+  (function () {
+    var plot = $('chart-plot');
+    plot.addEventListener('pointermove', onChartPoint);
+    plot.addEventListener('pointerdown', onChartPoint);
+    // A mouse leaving the chart dismisses the readout; a finger lifting off it
+    // must not, or the value vanishes the instant you go to read it.
+    plot.addEventListener('pointerleave', function (e) {
+      if (!e.pointerType || e.pointerType === 'mouse') hideTip();
+    });
+    plot.addEventListener('pointercancel', hideTip);
+  })();
 
   $('btn-pause').addEventListener('click', togglePause);
   $('btn-sound').addEventListener('click', function () {
