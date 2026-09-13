@@ -21,7 +21,8 @@
   var COLORS = 3;
   var MIN_RUN = 4;
   var MAX_LEVEL = 20;
-  var SEED_TOP_ROW = 5; // grime never spawns above this row
+  var SPEED_RAMP_MS = 20000; // pressure builds every 20s spent on a level
+  var SPEED_RAMP_STEPS = 8;  // and stops building after this many
 
   var DIRS = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
   var OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
@@ -281,14 +282,22 @@
     return Math.min(4 + level * 4, 64);
   }
 
+  // Clogs sit in the bottom of the pipe and only creep upward as levels get
+  // harder. Seeding them high makes them nearly unreachable, since nothing can
+  // be stacked underneath a clog to build a line through it.
+  function seedTopRow(level) {
+    return Math.max(5, Math.min(H - 2, 11 - Math.floor(level / 2)));
+  }
+
   // Places grime so that no colour already sits 3-in-a-line — otherwise a level
   // can cascade on its own the instant it opens.
   function seedLevel(level, rand) {
     rand = rand || Math.random;
     var board = makeBoard();
     var target = clogCount(level);
+    var top = seedTopRow(level);
     var slots = [];
-    for (var r = SEED_TOP_ROW; r < H; r++) {
+    for (var r = top; r < H; r++) {
       for (var c = 0; c < W; c++) slots.push(idx(c, r));
     }
 
@@ -318,9 +327,17 @@
     return n;
   }
 
-  // Milliseconds per row of free fall.
-  function fallInterval(level) {
-    return Math.max(110, 760 - level * 34);
+  // Milliseconds per row of free fall. Pressure builds the longer a level goes
+  // unsolved, so stalling costs you speed rather than being free.
+  function fallInterval(level, elapsedMs) {
+    var base = Math.max(110, 760 - level * 34);
+    var steps = Math.min(Math.floor((elapsedMs || 0) / SPEED_RAMP_MS), SPEED_RAMP_STEPS);
+    return Math.max(70, base * Math.pow(0.9, steps));
+  }
+
+  // How many times pressure has risen — the game announces each increase.
+  function pressureStep(elapsedMs) {
+    return Math.min(Math.floor((elapsedMs || 0) / SPEED_RAMP_MS), SPEED_RAMP_STEPS);
   }
 
   return {
@@ -334,6 +351,8 @@
     tryMove: tryMove, tryRotate: tryRotate, dropDistance: dropDistance,
     lockPiece: lockPiece, spawnPiece: spawnPiece, randomColors: randomColors,
     seedLevel: seedLevel, clogCount: clogCount, countClogs: countClogs,
-    runThrough: runThrough, fallInterval: fallInterval
+    runThrough: runThrough, fallInterval: fallInterval,
+    seedTopRow: seedTopRow, pressureStep: pressureStep,
+    SPEED_RAMP_MS: SPEED_RAMP_MS, SPEED_RAMP_STEPS: SPEED_RAMP_STEPS
   };
 });

@@ -193,8 +193,9 @@ function lcg(seed) {
     const b = C.seedLevel(level, lcg(level + 1));
     eq('level ' + level + ' places the requested grime', C.countClogs(b), C.clogCount(level));
     eq('level ' + level + ' opens with no free match', C.findMatches(b).size, 0);
-    const topRowsClear = b.slice(0, 5 * C.W).every(x => x === null);
-    check('level ' + level + ' keeps the top rows clear', topRowsClear);
+    const top = C.seedTopRow(level);
+    const topRowsClear = b.slice(0, top * C.W).every(x => x === null);
+    check('level ' + level + ' keeps everything above row ' + top + ' clear', topRowsClear);
     const noTriples = b.every((cell, i) =>
       !cell || C.runThrough(b, C.colOf(i), C.rowOf(i)) < 3);
     check('level ' + level + ' has no 3-in-a-line at seed', noTriples);
@@ -204,7 +205,39 @@ function lcg(seed) {
   eq('level 0 grime count', C.clogCount(0), 4);
   check('grime count is capped', C.clogCount(C.MAX_LEVEL) <= 64);
   check('speed increases with level', C.fallInterval(5) < C.fallInterval(0));
-  check('speed has a floor', C.fallInterval(99) >= 110);
+  check('speed has a floor', C.fallInterval(99) >= 70);
+}
+
+/* ------------------------------------------------- seed depth and pressure */
+{
+  // Clogs start low and only climb as levels get harder.
+  check('level 0 grime sits in the bottom of the pipe', C.seedTopRow(0) >= 11,
+    'topRow=' + C.seedTopRow(0));
+  check('harder levels allow grime higher up', C.seedTopRow(20) < C.seedTopRow(0));
+  check('grime never reaches the spawn rows', C.seedTopRow(20) >= 5,
+    'topRow=' + C.seedTopRow(20));
+
+  // Every level must have room to place its full complement without the
+  // no-3-in-a-line rule starving the placement loop.
+  for (let level = 0; level <= C.MAX_LEVEL; level++) {
+    const capacity = (C.H - C.seedTopRow(level)) * C.W;
+    check('level ' + level + ' has room for its grime', C.clogCount(level) <= capacity * 0.8,
+      C.clogCount(level) + ' of ' + capacity);
+  }
+
+  // Pressure: stalling on a level speeds the fall, up to a cap.
+  const fresh = C.fallInterval(0, 0);
+  check('pressure speeds the fall over time', C.fallInterval(0, 60000) < fresh,
+    fresh + ' -> ' + C.fallInterval(0, 60000));
+  check('pressure stops building at the cap',
+    C.fallInterval(0, C.SPEED_RAMP_MS * 50) === C.fallInterval(0, C.SPEED_RAMP_MS * C.SPEED_RAMP_STEPS),
+    String(C.fallInterval(0, C.SPEED_RAMP_MS * 50)));
+  check('pressure ramp is gradual, not a cliff',
+    C.fallInterval(0, C.SPEED_RAMP_MS) > fresh * 0.85,
+    fresh + ' -> ' + C.fallInterval(0, C.SPEED_RAMP_MS));
+  eq('pressure step counts elapsed time', C.pressureStep(C.SPEED_RAMP_MS * 3), 3);
+  eq('pressure step is capped', C.pressureStep(C.SPEED_RAMP_MS * 99), C.SPEED_RAMP_STEPS);
+  eq('a fresh level has no pressure', C.pressureStep(0), 0);
 }
 
 /* ---------------------------------------------------------------- report */

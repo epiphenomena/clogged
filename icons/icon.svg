@@ -5,63 +5,105 @@
       <stop offset="1" stop-color="#070a14"/>
     </linearGradient>
     <linearGradient id="casing" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#1b2440"/>
-      <stop offset="0.2" stop-color="#42527d"/>
-      <stop offset="0.55" stop-color="#28324f"/>
-      <stop offset="1" stop-color="#161d33"/>
-    </linearGradient>
-    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#8ff3e6"/>
-      <stop offset="0.45" stop-color="#2dd4bf"/>
-      <stop offset="1" stop-color="#0c6a60"/>
-    </linearGradient>
-    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#fcd77f"/>
-      <stop offset="0.45" stop-color="#f59e0b"/>
-      <stop offset="1" stop-color="#8a5206"/>
+      <stop offset="0" stop-color="#2d3550"/>
+      <stop offset="0.25" stop-color="#8b98bd"/>
+      <stop offset="0.6" stop-color="#4a5474"/>
+      <stop offset="1" stop-color="#222b45"/>
     </linearGradient>
     <linearGradient id="collar" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#b9c4dd"/>
-      <stop offset="0.5" stop-color="#69769a"/>
-      <stop offset="1" stop-color="#3d4767"/>
+      <stop offset="0" stop-color="#cdd6ea"/>
+      <stop offset="0.45" stop-color="#7b88ad"/>
+      <stop offset="1" stop-color="#2d3550"/>
     </linearGradient>
-    <radialGradient id="grime" cx="0.4" cy="0.35" r="0.7">
-      <stop offset="0" stop-color="#f7c0ff"/>
-      <stop offset="0.55" stop-color="#e879f9"/>
-      <stop offset="1" stop-color="#8a1fa1"/>
+    <!-- tube shading: dark rim, sheen, body, shadow -->
+    <linearGradient id="teal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12897c"/>
+      <stop offset="0.22" stop-color="#9ff6ea"/>
+      <stop offset="0.5" stop-color="#2dd4bf"/>
+      <stop offset="0.85" stop-color="#12897c"/>
+      <stop offset="1" stop-color="#084a44"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a96a06"/>
+      <stop offset="0.22" stop-color="#ffdf9a"/>
+      <stop offset="0.5" stop-color="#f59e0b"/>
+      <stop offset="0.85" stop-color="#a96a06"/>
+      <stop offset="1" stop-color="#5f3a03"/>
+    </linearGradient>
+    <radialGradient id="core" cx="0.38" cy="0.34" r="0.72">
+      <stop offset="0" stop-color="#a132ba"/>
+      <stop offset="0.6" stop-color="#5c1a6b"/>
+      <stop offset="1" stop-color="#16111c"/>
     </radialGradient>
   </defs>
 
   <rect width="512" height="512" rx="96" fill="url(#bg)"/>
 
-  <!-- pipe casing -->
-  <rect x="104" y="72" width="304" height="368" rx="40" fill="url(#casing)"/>
-  <rect x="146" y="106" width="220" height="300" rx="12" fill="#070a14"/>
-
-  <!-- rivets -->
-  <g fill="rgba(255,255,255,0.16)">
-    <circle cx="125" cy="160" r="8"/><circle cx="125" cy="256" r="8"/><circle cx="125" cy="352" r="8"/>
-    <circle cx="387" cy="160" r="8"/><circle cx="387" cy="256" r="8"/><circle cx="387" cy="352" r="8"/>
+  <!-- the pipe: side walls, threaded collar, dark well -->
+  <rect x="96" y="86" width="320" height="26" rx="8" fill="url(#casing)"/>
+  <rect x="96" y="112" width="34" height="300" fill="url(#casing)"/>
+  <rect x="382" y="112" width="34" height="300" fill="url(#casing)"/>
+  <rect x="130" y="112" width="252" height="300" fill="#070a13"/>
+  <rect x="96" y="412" width="320" height="24" rx="8" fill="url(#casing)"/>
+  <g fill="#0a0e18">
+    <rect x="152" y="419" width="34" height="11" rx="3"/>
+    <rect x="216" y="419" width="34" height="11" rx="3"/>
+    <rect x="280" y="419" width="34" height="11" rx="3"/>
+  </g>
+  <g fill="rgba(255,255,255,0.18)">
+    <circle cx="113" cy="180" r="7"/><circle cx="113" cy="290" r="7"/>
+    <circle cx="399" cy="180" r="7"/><circle cx="399" cy="290" r="7"/>
   </g>
 
-  <!-- horizontal coupler: two halves joined by a collar -->
+  <!-- a coupling: two enamelled pipe halves bolted together -->
   <g>
-    <path d="M170 146 h74 v82 h-74 a24 24 0 0 1 -24 -24 v-34 a24 24 0 0 1 24 -24 z" fill="url(#teal)"/>
-    <path d="M268 146 h74 a24 24 0 0 1 24 24 v34 a24 24 0 0 1 -24 24 h-74 z" fill="url(#amber)"/>
-    <rect x="244" y="152" width="24" height="70" fill="url(#collar)"/>
-    <circle cx="196" cy="187" r="17" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="9"/>
-    <path d="M298 187 h32" stroke="rgba(255,255,255,0.6)" stroke-width="9" stroke-linecap="round"/>
+    <path d="M158 152 h84 v96 h-84 a16 16 0 0 1 -16 -16 v-64 a16 16 0 0 1 16 -16 z" fill="url(#teal)"/>
+    <path d="M270 152 h84 a16 16 0 0 1 16 16 v64 a16 16 0 0 1 -16 16 h-84 z" fill="url(#amber)"/>
+    <rect x="242" y="158" width="28" height="84" rx="4" fill="url(#collar)"/>
+    <circle cx="256" cy="180" r="5" fill="#141a2c"/>
+    <circle cx="256" cy="220" r="5" fill="#141a2c"/>
+    <ellipse cx="152" cy="200" rx="5" ry="28" fill="rgba(8,11,20,0.5)" stroke="rgba(255,255,255,0.3)" stroke-width="3"/>
+    <ellipse cx="360" cy="200" rx="5" ry="28" fill="rgba(8,11,20,0.5)" stroke="rgba(255,255,255,0.3)" stroke-width="3"/>
+    <circle cx="196" cy="200" r="15" fill="none" stroke="rgba(255,255,255,0.62)" stroke-width="8"/>
+    <path d="M300 200 h30" stroke="rgba(255,255,255,0.62)" stroke-width="8" stroke-linecap="round"/>
   </g>
 
-  <!-- grime blob wedged at the bottom -->
-  <g>
-    <path d="M256 268 c34 0 62 14 70 40 c8 26 -4 56 -30 68 c-26 12 -62 12 -88 0 c-26 -12 -38 -42 -30 -68 c8 -26 44 -40 78 -40 z"
-          fill="url(#grime)" stroke="rgba(0,0,0,0.4)" stroke-width="8"/>
-    <g fill="rgba(255,255,255,0.22)">
-      <circle cx="228" cy="322" r="11"/><circle cx="272" cy="344" r="8"/><circle cx="288" cy="308" r="6"/>
+  <!-- a hairball wedged below it: strands curling around a matted core -->
+  <g stroke-linecap="round" fill="none">
+    <g stroke="#e879f9" stroke-width="7" opacity="0.7">
+      <path d="M289 377 Q288 414 255 399"/>
+      <path d="M275 382 Q247 430 213 386"/>
+      <path d="M249 392 Q230 421 227 394"/>
+      <path d="M237 382 Q207 387 214 356"/>
+      <path d="M216 365 Q185 311 255 294"/>
+      <path d="M219 350 Q191 338 214 332"/>
+      <path d="M223 323 Q241 290 277 313"/>
+      <path d="M237 318 Q279 283 304 341"/>
+      <path d="M263 308 Q292 295 296 328"/>
+      <path d="M275 318 Q326 319 305 368"/>
+      <path d="M296 335 Q326 338 305 353"/>
+      <path d="M293 350 Q330 382 291 394"/>
     </g>
-    <g stroke="rgba(255,255,255,0.6)" stroke-width="9" stroke-linecap="round">
-      <path d="M241 316 l30 30"/><path d="M271 316 l-30 30"/>
+    <g stroke="#f9c7ff" stroke-width="6" opacity="0.6">
+      <path d="M286 361 Q309 381 287 379"/>
+      <path d="M262 382 Q214 402 211 343"/>
+      <path d="M231 371 Q185 355 219 318"/>
+      <path d="M226 339 Q201 298 239 300"/>
+      <path d="M250 318 Q257 269 269 296"/>
+      <path d="M281 329 Q317 360 271 390"/>
+    </g>
+    <circle cx="256" cy="350" r="52" fill="url(#core)" stroke="rgba(0,0,0,0.5)" stroke-width="5"/>
+    <g stroke="#e879f9" stroke-width="5" opacity="0.5">
+      <path d="M297 367 Q256 350 216 369"/>
+      <path d="M226 383 Q256 350 251 306"/>
+      <path d="M234 311 Q256 350 300 360"/>
+      <path d="M300 342 Q256 350 233 388"/>
+      <path d="M249 394 Q256 350 227 316"/>
+      <path d="M216 330 Q256 350 298 334"/>
+    </g>
+    <g stroke="rgba(255,255,255,0.85)" stroke-width="8">
+      <path d="M238 332 l36 36"/>
+      <path d="M274 332 l-36 36"/>
     </g>
   </g>
 </svg>

@@ -30,7 +30,11 @@ function makeCtx() {
 
 /* --------------------------------------------------------------- DOM stub */
 const els = new Map();
-function makeEl(id) {
+const VIEWPORT = { w: 390, h: 844 };
+// The HUD strip is measured by layout() to decide where the pipe starts.
+const RECTS = { hud: { width: VIEWPORT.w, height: 46 } };
+
+function makeEl(id, rect) {
   const listeners = new Map();
   let _text = '';
   const el = {
@@ -56,7 +60,9 @@ function makeEl(id) {
     },
     removeEventListener: () => {},
     getContext: () => makeCtx(),
-    getBoundingClientRect: () => ({ width: 390, height: 620, left: 0, top: 0 }),
+    getBoundingClientRect: () => Object.assign(
+      { width: VIEWPORT.w, height: VIEWPORT.h, left: 0, top: 0 },
+      rect || RECTS[id] || null),
     setPointerCapture: () => {},
     releasePointerCapture: () => {},
     fire(type, ev = {}) {
@@ -84,6 +90,22 @@ global.fireWindow = (t, ev = {}) => {
 global.document = {
   hidden: false,
   _listeners: new Map(),
+  documentElement: { clientWidth: VIEWPORT.w, clientHeight: VIEWPORT.h },
+  body: (() => {
+    const classes = new Set();
+    return {
+      appendChild() {},
+      classes,
+      classList: {
+        add: (c) => classes.add(c),
+        remove: (c) => classes.delete(c),
+        contains: (c) => classes.has(c)
+      }
+    };
+  })(),
+  // Detached elements (the safe-area probe, the offscreen background canvas)
+  // report zero size, the way a real one with no layout would.
+  createElement: (tag) => makeEl('<' + tag + '>', { width: 0, height: 0 }),
   getElementById(id) {
     if (!els.has(id)) els.set(id, makeEl(id));
     return els.get(id);
@@ -121,7 +143,8 @@ global.AudioContext = class {
   resume() {}
   createOscillator() {
     return {
-      type: '', frequency: { setValueAtTime() {} },
+      type: '',
+      frequency: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
       connect(n) { return n; }, start() {}, stop() {}
     };
   }
@@ -168,11 +191,25 @@ function check(name, cond, detail) {
   if (!cond) problems.push(name + (detail ? ' — ' + detail : ''));
 }
 
+// getElementById creates stubs on demand, so a renamed or deleted element would
+// otherwise fake success. Require each one to have been wired by the game.
+[['btn-start', 'click'], ['btn-pause', 'click'], ['btn-sound', 'click'],
+ ['btn-resume', 'click'], ['btn-restart', 'click'], ['btn-quit', 'click'],
+ ['btn-retry', 'click'], ['btn-menu', 'click'], ['btn-next-level', 'click'],
+ ['lv-up', 'click'], ['lv-down', 'click'],
+ ['board', 'pointerdown'], ['board', 'pointermove'], ['board', 'pointerup']
+].forEach(([id, ev]) => {
+  check('#' + id + ' is wired for ' + ev, el(id).listeners.has(ev));
+});
+
 check('menu is visible at boot', visible('ov-menu'));
+// The canvas fills the viewport via CSS; JS only sets the backing-store size.
 check('board canvas got a pixel size', el('board').width > 0,
   'width=' + el('board').width);
-check('board canvas has a css size', /px$/.test(el('board').style.width || ''),
-  'style.width=' + el('board').style.width);
+check('board canvas is retina-backed for the viewport',
+  el('board').width === Math.round(VIEWPORT.w * global.devicePixelRatio),
+  el('board').width + ' vs ' + VIEWPORT.w * global.devicePixelRatio);
+check('next preview is sized', el('next').width > 0, 'width=' + el('next').width);
 
 
 /* ------------------------------------------------- greedy player + hooks */
@@ -182,6 +219,12 @@ let pendingSpawn = false;
 let liveColors = [0, 1];
 const _find = C.findMatches;
 C.findMatches = function (board, min) { liveBoard = board; return _find(board, min); };
+let lockCount = 0;
+const _lockPiece = C.lockPiece;
+C.lockPiece = function (board, piece) { lockCount++; return _lockPiece(board, piece); };
+let lastRotateDir = 0;
+const _rotate = C.tryRotate;
+C.tryRotate = function (board, piece, dir) { lastRotateDir = dir; return _rotate(board, piece, dir); };
 const _spawn = C.spawnPiece;
 C.spawnPiece = function (colors) { pendingSpawn = true; liveColors = colors.slice(); return _spawn(colors); };
 
@@ -332,6 +375,8 @@ check('clearing the level scored points', Number(el('hud-score').textContent) > 
 check('level clear names the level', /Level 0 flushed/.test(el('clear-info').textContent),
   el('clear-info').textContent);
 check('best score persisted', store.has('clogged.best'), [...store.keys()].join(','));
+check('the HUD steps aside for the flush effect',
+  global.document.body.classes.has('fx-active'));
 
 const scoreAfterL0 = Number(el('hud-score').textContent);
 el('btn-next-level').fire('click');
@@ -343,6 +388,8 @@ check('next level keeps the running score',
   'before=' + scoreAfterL0 + ' after=' + el('hud-score').textContent);
 check('next level reseeds grime', el('hud-clogs').textContent === '8',
   'clogs=' + el('hud-clogs').textContent);
+check('the HUD comes back for the next level',
+  !global.document.body.classes.has('fx-active'));
 
 const run2 = clearLevel(6);
 check('the player also clears level 1', run2.cleared,
@@ -368,8 +415,14 @@ global.document.hidden = false;
 el('btn-resume').fire('click');
 for (let i = 0; i < 20; i++) tick(16);
 
-// Drag across the pipe, tap to rotate, flick down to drop.
+/* --------------------------------------------------------------- gestures */
+// The pipe is the only controller now, so these paths carry the whole game.
 const board = el('board');
+check('the pipe listens for drags',
+  board.listeners.has('pointerdown') && board.listeners.has('pointermove'),
+  [...board.listeners.keys()].join(','));
+
+// Drag sideways: the piece follows the finger without ending the run.
 board.fire('pointerdown', { pointerId: 1, clientX: 100, clientY: 300 });
 for (let x = 100; x <= 240; x += 20) {
   board.fire('pointermove', { pointerId: 1, clientX: x, clientY: 302 });
@@ -379,31 +432,50 @@ board.fire('pointerup', { pointerId: 1, clientX: 240, clientY: 302 });
 tick(16);
 check('drag did not end the game', !visible('ov-gameover'));
 
+// A tap spins counter-clockwise.
+lastRotateDir = 0;
 board.fire('pointerdown', { pointerId: 2, clientX: 150, clientY: 300 });
 board.fire('pointerup', { pointerId: 2, clientX: 150, clientY: 300 });
 tick(16);
+check('tapping spins counter-clockwise', lastRotateDir === -1, 'dir=' + lastRotateDir);
 
-const beforeFlick = Number(el('hud-score').textContent);
+// Swiping up spins the other way.
+lastRotateDir = 0;
+board.fire('pointerdown', { pointerId: 4, clientX: 150, clientY: 400 });
+tick(16);
+board.fire('pointermove', { pointerId: 4, clientX: 150, clientY: 280 });
+board.fire('pointerup', { pointerId: 4, clientX: 150, clientY: 280 });
+tick(16);
+check('swiping up spins clockwise', lastRotateDir === 1, 'dir=' + lastRotateDir);
+
+// A fast downward flick slams the piece home: a piece must lock. Counting
+// locks rather than segments, since the landing may immediately clear a line.
+const beforeFlick = lockCount;
 board.fire('pointerdown', { pointerId: 3, clientX: 150, clientY: 180 });
-board.fire('pointermove', { pointerId: 3, clientX: 152, clientY: 340 });
-board.fire('pointerup', { pointerId: 3, clientX: 152, clientY: 340 });
+tick(16); // 16ms later, 200px down => ~12px/ms, comfortably a flick
+board.fire('pointermove', { pointerId: 3, clientX: 152, clientY: 380 });
+board.fire('pointerup', { pointerId: 3, clientX: 152, clientY: 380 });
 for (let i = 0; i < 40; i++) tick(16);
-check('a downward flick hard-drops (score rises)',
-  Number(el('hud-score').textContent) > beforeFlick,
-  beforeFlick + ' -> ' + el('hud-score').textContent);
+check('a downward flick slams the piece home', lockCount > beforeFlick,
+  'locks ' + beforeFlick + ' -> ' + lockCount);
 
-['ctl-left', 'ctl-right', 'ctl-down', 'ctl-cw', 'ctl-ccw'].forEach((id) => {
-  el(id).fire('pointerdown', { pointerId: 9 });
-  el(id).fire('pointerup', { pointerId: 9 });
-});
-for (let i = 0; i < 20; i++) tick(16);
-check('thumb controls did not break the run', !visible('ov-gameover'));
+// Keyboard rotation matches: Z / ArrowUp counter-clockwise, X clockwise.
+lastRotateDir = 0;
+global.document.fire('keydown', { key: 'ArrowUp' });
+check('ArrowUp spins counter-clockwise like a tap', lastRotateDir === -1, 'dir=' + lastRotateDir);
+lastRotateDir = 0;
+global.document.fire('keydown', { key: 'x' });
+check('X spins clockwise', lastRotateDir === 1, 'dir=' + lastRotateDir);
 
-el('btn-mute').fire('click');
+/* ------------------------------------------------------------ sound toggle */
+check('the sound button is wired', el('btn-sound').listeners.has('click'));
+el('btn-sound').fire('click');
 check('mute persists', store.get('clogged.muted') === 'true', store.get('clogged.muted'));
-check('mute glyph updates', el('btn-mute').textContent === '🔇', el('btn-mute').textContent);
-el('btn-mute').fire('click');
-check('unmute glyph restores', el('btn-mute').textContent === '🔊');
+check('sound button reads off', el('btn-sound').textContent === 'Sound: off',
+  el('btn-sound').textContent);
+el('btn-sound').fire('click');
+check('sound button reads on again', el('btn-sound').textContent === 'Sound: on',
+  el('btn-sound').textContent);
 
 /* ------------------------------------------------- restart / quit / lose */
 const scoreBeforeRestart = Number(el('hud-score').textContent);
