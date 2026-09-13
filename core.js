@@ -21,8 +21,14 @@
   var COLORS = 3;
   var MIN_RUN = 4;
   var MAX_LEVEL = 20;
-  var SPEED_RAMP_MS = 20000; // pressure builds every 20s spent on a level
-  var SPEED_RAMP_STEPS = 8;  // and stops building after this many
+  // Pressure is meant to punish stalling, not ordinary play. Nothing happens at
+  // all until the grace period is up, and a big level buys more of it, since
+  // clearing 64 clogs honestly takes far longer than clearing 4.
+  var PRESSURE_GRACE_MS = 60000;
+  var PRESSURE_GRACE_PER_LEVEL_MS = 4000;
+  var PRESSURE_STEP_MS = 30000;   // then one step every 30s
+  var PRESSURE_FACTOR = 0.95;     // each step shaves 5% off the fall interval
+  var PRESSURE_MAX_STEPS = 10;    // ~1.7x at the very top, reached after ~5.5 min
 
   var DIRS = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
   var OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
@@ -327,17 +333,22 @@
     return n;
   }
 
-  // Milliseconds per row of free fall. Pressure builds the longer a level goes
-  // unsolved, so stalling costs you speed rather than being free.
-  function fallInterval(level, elapsedMs) {
-    var base = Math.max(110, 760 - level * 34);
-    var steps = Math.min(Math.floor((elapsedMs || 0) / SPEED_RAMP_MS), SPEED_RAMP_STEPS);
-    return Math.max(70, base * Math.pow(0.9, steps));
+  // How long a level can run before pressure starts building at all.
+  function pressureGrace(level) {
+    return PRESSURE_GRACE_MS + Math.max(0, level || 0) * PRESSURE_GRACE_PER_LEVEL_MS;
   }
 
   // How many times pressure has risen — the game announces each increase.
-  function pressureStep(elapsedMs) {
-    return Math.min(Math.floor((elapsedMs || 0) / SPEED_RAMP_MS), SPEED_RAMP_STEPS);
+  function pressureStep(level, elapsedMs) {
+    var past = (elapsedMs || 0) - pressureGrace(level);
+    if (past < 0) return 0;
+    return Math.min(Math.floor(past / PRESSURE_STEP_MS) + 1, PRESSURE_MAX_STEPS);
+  }
+
+  // Milliseconds per row of free fall.
+  function fallInterval(level, elapsedMs) {
+    var base = Math.max(110, 760 - level * 34);
+    return Math.max(70, base * Math.pow(PRESSURE_FACTOR, pressureStep(level, elapsedMs)));
   }
 
   return {
@@ -352,7 +363,11 @@
     lockPiece: lockPiece, spawnPiece: spawnPiece, randomColors: randomColors,
     seedLevel: seedLevel, clogCount: clogCount, countClogs: countClogs,
     runThrough: runThrough, fallInterval: fallInterval,
-    seedTopRow: seedTopRow, pressureStep: pressureStep,
-    SPEED_RAMP_MS: SPEED_RAMP_MS, SPEED_RAMP_STEPS: SPEED_RAMP_STEPS
+    seedTopRow: seedTopRow, pressureStep: pressureStep, pressureGrace: pressureGrace,
+    PRESSURE_GRACE_MS: PRESSURE_GRACE_MS,
+    PRESSURE_GRACE_PER_LEVEL_MS: PRESSURE_GRACE_PER_LEVEL_MS,
+    PRESSURE_STEP_MS: PRESSURE_STEP_MS,
+    PRESSURE_FACTOR: PRESSURE_FACTOR,
+    PRESSURE_MAX_STEPS: PRESSURE_MAX_STEPS
   };
 });

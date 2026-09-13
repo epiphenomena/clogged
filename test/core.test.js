@@ -225,19 +225,49 @@ function lcg(seed) {
       C.clogCount(level) + ' of ' + capacity);
   }
 
-  // Pressure: stalling on a level speeds the fall, up to a cap.
+  // Pressure is for stalling, so ordinary play must never feel it.
+  const grace = C.pressureGrace(0);
   const fresh = C.fallInterval(0, 0);
-  check('pressure speeds the fall over time', C.fallInterval(0, 60000) < fresh,
-    fresh + ' -> ' + C.fallInterval(0, 60000));
-  check('pressure stops building at the cap',
-    C.fallInterval(0, C.SPEED_RAMP_MS * 50) === C.fallInterval(0, C.SPEED_RAMP_MS * C.SPEED_RAMP_STEPS),
-    String(C.fallInterval(0, C.SPEED_RAMP_MS * 50)));
-  check('pressure ramp is gradual, not a cliff',
-    C.fallInterval(0, C.SPEED_RAMP_MS) > fresh * 0.85,
-    fresh + ' -> ' + C.fallInterval(0, C.SPEED_RAMP_MS));
-  eq('pressure step counts elapsed time', C.pressureStep(C.SPEED_RAMP_MS * 3), 3);
-  eq('pressure step is capped', C.pressureStep(C.SPEED_RAMP_MS * 99), C.SPEED_RAMP_STEPS);
-  eq('a fresh level has no pressure', C.pressureStep(0), 0);
+  eq('a fresh level has no pressure', C.pressureStep(0, 0), 0);
+  eq('no pressure part way through the grace period',
+    C.pressureStep(0, grace / 2), 0);
+  eq('no pressure right up to the end of the grace period',
+    C.pressureStep(0, grace - 1), 0);
+  check('a full minute of grace at least', grace >= 60000, 'grace=' + grace);
+  check('speed is untouched during the grace period',
+    C.fallInterval(0, grace - 1) === fresh,
+    fresh + ' -> ' + C.fallInterval(0, grace - 1));
+
+  // Harder levels legitimately take longer, so they get longer before it bites.
+  check('a harder level gets more grace', C.pressureGrace(20) > C.pressureGrace(0),
+    C.pressureGrace(0) + ' -> ' + C.pressureGrace(20));
+  eq('no pressure on a long level inside its own grace',
+    C.pressureStep(20, C.pressureGrace(0) + 1000), 0);
+
+  // Then it builds, one gentle step at a time.
+  eq('pressure starts when the grace period ends', C.pressureStep(0, grace), 1);
+  eq('pressure rises one step per interval',
+    C.pressureStep(0, grace + C.PRESSURE_STEP_MS * 3), 4);
+  eq('pressure is capped', C.pressureStep(0, grace + C.PRESSURE_STEP_MS * 999),
+    C.PRESSURE_MAX_STEPS);
+  check('pressure speeds the fall once it starts',
+    C.fallInterval(0, grace + C.PRESSURE_STEP_MS) < fresh,
+    fresh + ' -> ' + C.fallInterval(0, grace + C.PRESSURE_STEP_MS));
+
+  // Each step is a nudge, not a cliff.
+  check('one step changes the fall by only a few percent',
+    C.fallInterval(0, grace) > fresh * 0.9,
+    fresh + ' -> ' + C.fallInterval(0, grace));
+  const maxed = C.fallInterval(0, grace + C.PRESSURE_STEP_MS * 999);
+  check('even fully wound up it stays under twice the speed',
+    maxed > fresh / 2, fresh + ' -> ' + maxed);
+  check('fully wound up is still faster than the start', maxed < fresh,
+    fresh + ' -> ' + maxed);
+
+  // Reaching the cap should take minutes of stalling, not seconds.
+  const toCap = grace + C.PRESSURE_STEP_MS * (C.PRESSURE_MAX_STEPS - 1);
+  check('reaching full pressure takes over four minutes', toCap > 240000,
+    'toCap=' + Math.round(toCap / 1000) + 's');
 }
 
 /* ---------------------------------------------------------------- report */

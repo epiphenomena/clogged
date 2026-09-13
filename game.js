@@ -1099,7 +1099,7 @@
     if (S.phase === 'play') {
       // Pressure only builds while actually playing, never while paused.
       S.levelElapsed += dt;
-      var step = C.pressureStep(S.levelElapsed);
+      var step = C.pressureStep(S.level, S.levelElapsed);
       if (step > S.pressure) {
         S.pressure = step;
         toast('PRESSURE UP', '#ff9d5c');

@@ -28,8 +28,10 @@ Three details make or break a plan:
   survivor is cut loose and drops — which is how you set up chains. Loose halves
   lose their bolted flange and shrink to a plain plug, so you can see at a glance
   which pieces are free.
-- **Pressure builds.** The longer a level goes unsolved, the faster couplings
-  fall. Stalling is not free.
+- **Pressure builds, eventually.** Nothing changes for the first minute — longer
+  on a big level, which honestly takes longer to clear. After that the couplings
+  speed up a few percent every 30 seconds, topping out around 1.7× after five
+  and a half minutes of stalling. It punishes dithering, not ordinary play.
 
 Chains multiply your score: each cascade step in a single landing doubles the
 multiplier, up to 16×.

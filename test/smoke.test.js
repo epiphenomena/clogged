@@ -222,6 +222,14 @@ let pendingSpawn = false;
 let liveColors = [0, 1];
 const _find = C.findMatches;
 C.findMatches = function (board, min) { liveBoard = board; return _find(board, min); };
+// A signature slip here fails silently: called with the wrong argument order,
+// pressureStep just returns 0 forever and the ramp quietly stops existing.
+let pressureCalls = [];
+const _pressureStep = C.pressureStep;
+C.pressureStep = function (level, elapsed) {
+  pressureCalls.push([level, elapsed]);
+  return _pressureStep(level, elapsed);
+};
 let lockCount = 0;
 const _lockPiece = C.lockPiece;
 C.lockPiece = function (board, piece) { lockCount++; return _lockPiece(board, piece); };
@@ -515,6 +523,36 @@ tick(16);
 check('retry restarts at the same level', el('hud-level').textContent === '20',
   el('hud-level').textContent);
 check('retry clears the game-over overlay', !visible('ov-gameover'));
+
+/* ---------------------------------------------------------------- pressure */
+{
+  check('the game asks for the pressure step while playing', pressureCalls.length > 0,
+    'calls=' + pressureCalls.length);
+  check('pressure is asked about a real level',
+    pressureCalls.every(([lv]) => typeof lv === 'number' && lv >= 0 && lv <= C.MAX_LEVEL),
+    JSON.stringify(pressureCalls[0]));
+  check('pressure is asked about elapsed time, not undefined',
+    pressureCalls.every(([, ms]) => typeof ms === 'number' && isFinite(ms) && ms >= 0),
+    JSON.stringify(pressureCalls[0]));
+  // A competent player clears a level in seconds, so stall one on purpose:
+  // sit on level 0 without touching it for well past the grace period.
+  startAt(0);
+  pressureCalls = [];
+  const holdMs = C.pressureGrace(0) + C.PRESSURE_STEP_MS * 2;
+  for (let t = 0; t < holdMs && !visible('ov-gameover') && !visible('ov-clear'); t += 16) {
+    tick(16);
+  }
+  const longest = pressureCalls.reduce((m, [, ms]) => Math.max(m, ms), 0);
+  check('a stalled level runs past the grace period',
+    longest > C.pressureGrace(0),
+    'longest=' + Math.round(longest / 1000) + 's grace=' + Math.round(C.pressureGrace(0) / 1000) + 's');
+  check('stalling that long does raise the pressure',
+    _pressureStep(0, longest) > 0, 'step=' + _pressureStep(0, longest));
+  check('but a full minute of it changes nothing at all',
+    _pressureStep(0, C.pressureGrace(0) - 1) === 0);
+  el('btn-pause').fire('click');
+  el('btn-quit').fire('click');
+}
 
 /* ------------------------------------------------------------ score history */
 {
