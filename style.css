@@ -98,8 +98,8 @@ body {
 .icon-btn {
   pointer-events: auto;
   flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   font-size: 11px;
   letter-spacing: 1px;
   line-height: 1;
@@ -111,6 +111,7 @@ body {
 }
 
 .icon-btn:active { background: rgba(255, 255, 255, 0.16); }
+.icon-btn svg { display: block; width: 17px; height: 17px; margin: 0 auto; fill: currentColor; }
 
 /* ------------------------------------------------------------ overlays */
 
@@ -200,6 +201,8 @@ body {
 }
 
 .mini-btn:active { background: rgba(255, 255, 255, 0.16); }
+
+.pause-line { margin: -6px 0 16px; font-size: 13px; color: var(--muted); }
 
 .level-readout { display: flex; flex-direction: column; gap: 2px; min-width: 104px; }
 #lv-num { font-size: 17px; font-weight: 700; }

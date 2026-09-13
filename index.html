@@ -31,7 +31,12 @@
     <span class="hud-sub">LEVEL <b id="hud-level">0</b></span>
     <span class="hud-sub">CLOGS <b id="hud-clogs">0</b></span>
   </div>
-  <button id="btn-pause" class="icon-btn" aria-label="Pause">❚❚</button>
+  <button id="btn-pause" class="icon-btn" aria-label="Pause game">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="7" y="4.5" width="4" height="15" rx="1.6"/>
+      <rect x="13" y="4.5" width="4" height="15" rx="1.6"/>
+    </svg>
+  </button>
 </header>
 
 <div class="overlay" id="ov-menu">
@@ -57,10 +62,11 @@
 <div class="overlay hidden" id="ov-pause">
   <div class="panel">
     <h2 class="subtitle">Paused</h2>
+    <p class="pause-line" id="pause-score">Score 0 · level 0</p>
     <button class="big-btn" id="btn-resume">RESUME</button>
+    <button class="ghost-btn" id="btn-new-game">New game</button>
+    <button class="ghost-btn" id="btn-pause-scores">High scores</button>
     <button class="ghost-btn" id="btn-sound">Sound: on</button>
-    <button class="ghost-btn" id="btn-restart">Restart level</button>
-    <button class="ghost-btn" id="btn-quit">Quit to menu</button>
   </div>
 </div>
 

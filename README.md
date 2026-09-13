@@ -42,9 +42,9 @@ Every finished run is kept on the device — when you top out, quit mid-run, or
 restart a level. Clearing a level does not end a run, so a long climb is filed
 once, under its final score.
 
-**Scores** on the title screen shows two things: the last 25 runs plotted over
-time, and the all-time top ten with the level reached and the date. Touch the
-chart to read any run off it.
+**Scores** — on the title screen, in the pause menu, and after a game ends —
+shows two things: the last 25 runs plotted over time, and the all-time top ten
+with the level reached and the date. Touch the chart to read any run off it.
 
 Two lists are stored rather than one. The rolling window behind the chart keeps
 the 50 most recent runs, while the top ten is never evicted by age — so a great
@@ -61,7 +61,7 @@ The pipe itself is the controller — there is no button row to cover the board.
 | Spin the other way | Swipe up | <kbd>X</kbd> |
 | Ease down | Drag downward | <kbd>↓</kbd> |
 | Slam | Flick down | <kbd>Space</kbd> |
-| Pause | ❚❚ in the header | <kbd>P</kbd> or <kbd>Esc</kbd> |
+| Pause | The pause button in the header | <kbd>P</kbd> or <kbd>Esc</kbd> |
 
 Dragging maps your finger to an absolute column, so the piece tracks your thumb
 instead of drifting, and dragging downward walks the piece down with you. A
@@ -69,6 +69,18 @@ dashed outline previews where it will land.
 
 Each colour also carries a shape — ring, bar, cross — so the game is playable
 without relying on colour vision.
+
+## Pausing
+
+The pause button sits in the top-right corner, and the menu behind it offers
+**Resume**, **New game**, **High scores** and the **sound** toggle. Starting a
+new game banks the run you were on before handing back the title screen, so
+walking away from a game never loses its score.
+
+The game also pauses itself whenever it stops being the thing you are looking
+at: switching tabs, switching apps, or another window taking focus while this
+one stays visible. Losing focus only ever pauses — it will not resume a game
+sitting behind a menu you are still reading.
 
 ## Install
 

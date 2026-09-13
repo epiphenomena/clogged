@@ -1311,16 +1311,29 @@
 
   /* ------------------------------------------------------------- overlays */
 
+  function inPlay() {
+    return S.phase === 'play' || S.phase === 'clearing' || S.phase === 'settling';
+  }
+
+  // Losing focus must only ever pause. Toggling there could resume a game
+  // behind an overlay the player is still reading.
+  function pauseGame() {
+    if (!inPlay()) return;
+    S.resumePhase = S.phase;
+    S.phase = 'paused';
+    gesture = null;
+    $('pause-score').textContent = 'Score ' + fmtNum(S.score) + ' · level ' + S.level;
+    show('ov-pause');
+  }
+
+  function resumeGame() {
+    if (S.phase !== 'paused') return;
+    hide('ov-pause');
+    S.phase = S.resumePhase;
+  }
+
   function togglePause() {
-    if (S.phase === 'play' || S.phase === 'clearing' || S.phase === 'settling') {
-      S.resumePhase = S.phase;
-      S.phase = 'paused';
-      gesture = null;
-      show('ov-pause');
-    } else if (S.phase === 'paused') {
-      hide('ov-pause');
-      S.phase = S.resumePhase;
-    }
+    if (S.phase === 'paused') resumeGame(); else pauseGame();
   }
 
   /* --------------------------------------------------------- score screen */
@@ -1577,12 +1590,11 @@
     Sound.unlock();
     startLevel(S.startLevel, false);
   });
-  $('btn-resume').addEventListener('click', togglePause);
-  $('btn-restart').addEventListener('click', function () {
-    hide('ov-pause');
-    startLevel(S.level, false);
-  });
-  $('btn-quit').addEventListener('click', toMenu);
+  $('btn-resume').addEventListener('click', resumeGame);
+  // Banks the run, then hands back the title screen so the next game can start
+  // at whatever level the player wants.
+  $('btn-new-game').addEventListener('click', toMenu);
+  $('btn-pause-scores').addEventListener('click', function () { openScores('ov-pause'); });
   $('btn-menu').addEventListener('click', toMenu);
   $('btn-next-level').addEventListener('click', function () {
     hide('ov-clear');
@@ -1617,11 +1629,13 @@
     if (!Sound.muted) { Sound.unlock(); Sound.rotate(); }
   });
 
+  // Anything that takes attention away from the game pauses it: switching tabs,
+  // switching apps, or another window taking focus while this one stays visible.
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden && (S.phase === 'play' || S.phase === 'clearing' || S.phase === 'settling')) {
-      togglePause();
-    }
+    if (document.hidden) pauseGame();
   });
+  self.addEventListener('blur', pauseGame);
+  self.addEventListener('pagehide', pauseGame);
 
   /* ----------------------------------------------------------------- boot */
 

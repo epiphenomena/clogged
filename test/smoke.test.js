@@ -197,7 +197,7 @@ function check(name, cond, detail) {
 // getElementById creates stubs on demand, so a renamed or deleted element would
 // otherwise fake success. Require each one to have been wired by the game.
 [['btn-start', 'click'], ['btn-pause', 'click'], ['btn-sound', 'click'],
- ['btn-resume', 'click'], ['btn-restart', 'click'], ['btn-quit', 'click'],
+ ['btn-resume', 'click'], ['btn-new-game', 'click'], ['btn-pause-scores', 'click'],
  ['btn-retry', 'click'], ['btn-menu', 'click'], ['btn-next-level', 'click'],
  ['lv-up', 'click'], ['lv-down', 'click'],
  ['board', 'pointerdown'], ['board', 'pointermove'], ['board', 'pointerup']
@@ -488,24 +488,63 @@ el('btn-sound').fire('click');
 check('sound button reads on again', el('btn-sound').textContent === 'Sound: on',
   el('btn-sound').textContent);
 
-/* ------------------------------------------------- restart / quit / lose */
-const scoreBeforeRestart = Number(el('hud-score').textContent);
-const bestBeforeRestart = Number(store.get('clogged.best') || 0);
+/* ------------------------------------------------------------- pause menu */
 el('btn-pause').fire('click');
-el('btn-restart').fire('click');
-tick(16);
-check('restart resets the score', el('hud-score').textContent === '0',
-  el('hud-score').textContent);
-check('restart closes overlays', !visible('ov-pause') && !visible('ov-menu'));
-// Restarting must bank the run first, or the score is silently lost.
-check('restart does not discard the run from the best score',
-  Number(store.get('clogged.best') || 0) >= Math.max(scoreBeforeRestart, bestBeforeRestart),
-  'run=' + scoreBeforeRestart + ' bestBefore=' + bestBeforeRestart +
-  ' bestAfter=' + store.get('clogged.best'));
+check('the pause button opens the menu', visible('ov-pause'));
+check('the pause menu shows the run so far',
+  /Score .* level \d+/.test(el('pause-score').textContent), el('pause-score').textContent);
+check('the pause menu offers resume', el('btn-resume').listeners.has('click'));
+check('the pause menu offers a new game', el('btn-new-game').listeners.has('click'));
+check('the pause menu offers high scores', el('btn-pause-scores').listeners.has('click'));
+check('the pause menu offers the sound toggle', el('btn-sound').listeners.has('click'));
 
+// High scores open over the pause menu and hand it back on close.
+el('btn-pause-scores').fire('click');
+check('high scores open from the pause menu', visible('ov-scores'));
+check('the pause menu steps aside for them', !visible('ov-pause'));
+const frozenWhileReading = el('hud-score').textContent;
+for (let i = 0; i < 200; i++) tick(16);
+check('the game stays paused behind the scores screen',
+  el('hud-score').textContent === frozenWhileReading);
+el('btn-scores-back').fire('click');
+check('closing scores returns to the pause menu', visible('ov-pause'));
+check('the scores screen closed', !visible('ov-scores'));
+
+el('btn-resume').fire('click');
+check('resume closes the pause menu', !visible('ov-pause'));
+
+// Losing focus pauses, and must never toggle a paused game back on.
+global.fireWindow('blur');
+check('losing window focus pauses', visible('ov-pause'));
+const frozenOnBlur = el('hud-score').textContent;
+for (let i = 0; i < 200; i++) tick(16);
+check('a blurred game does not advance', el('hud-score').textContent === frozenOnBlur);
+global.fireWindow('blur');
+check('a second blur does not resume the game', visible('ov-pause'));
+global.document.hidden = true;
+global.document.fire('visibilitychange');
+check('hiding the tab while paused keeps it paused', visible('ov-pause'));
+global.document.hidden = false;
+el('btn-resume').fire('click');
+check('resume works after a focus pause', !visible('ov-pause'));
+for (let i = 0; i < 20; i++) tick(16);
+
+/* --------------------------------------------------- new game / quit / lose */
+const scoreBeforeNew = Number(el('hud-score').textContent);
+const bestBeforeNew = Number(store.get('clogged.best') || 0);
 el('btn-pause').fire('click');
-el('btn-quit').fire('click');
-check('quit returns to menu', visible('ov-menu'));
+el('btn-new-game').fire('click');
+check('new game returns to the title screen', visible('ov-menu'));
+// Starting over must bank the run first, or the score is silently lost.
+check('new game does not discard the run from the best score',
+  Number(store.get('clogged.best') || 0) >= Math.max(scoreBeforeNew, bestBeforeNew),
+  'run=' + scoreBeforeNew + ' bestBefore=' + bestBeforeNew +
+  ' bestAfter=' + store.get('clogged.best'));
+el('btn-start').fire('click');
+tick(16);
+check('the new game starts from zero', el('hud-score').textContent === '0',
+  el('hud-score').textContent);
+check('the new game closes the overlays', !visible('ov-pause') && !visible('ov-menu'));
 
 // A hopeless stack must end the game rather than hang.
 startAt(20);
@@ -551,7 +590,7 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   check('but a full minute of it changes nothing at all',
     _pressureStep(0, C.pressureGrace(0) - 1) === 0);
   el('btn-pause').fire('click');
-  el('btn-quit').fire('click');
+  el('btn-new-game').fire('click');
 }
 
 /* ------------------------------------------------------------ score history */
@@ -592,7 +631,7 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   const beforeQuit = saved().runs.length;
   const quitScore = Number(el('hud-score').textContent);
   el('btn-pause').fire('click');
-  el('btn-quit').fire('click');
+  el('btn-new-game').fire('click');
   check('quitting mid-run records it', saved().runs.length === beforeQuit + 1,
     beforeQuit + ' -> ' + saved().runs.length);
   const last = saved().runs[saved().runs.length - 1];
@@ -611,7 +650,7 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
 /* -------------------------------------------------------- score screen UI */
 {
   el('btn-pause').fire('click');
-  el('btn-quit').fire('click');
+  el('btn-new-game').fire('click');
   check('the scores button is wired', el('btn-scores').listeners.has('click'));
   el('btn-scores').fire('click');
   check('the scores screen opens', visible('ov-scores'));
