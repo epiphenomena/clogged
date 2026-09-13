@@ -93,7 +93,13 @@
       osc.start(t0);
       osc.stop(t0 + dur + 0.02);
     },
-    move: function () { this.tone(180, 0.04, 'square', 0.045); },
+    lastMove: 0,
+    move: function () {
+      var now = self.performance ? performance.now() : 0;
+      if (now - this.lastMove < 45) return;
+      this.lastMove = now;
+      this.tone(180, 0.04, 'square', 0.045);
+    },
     rotate: function () { this.tone(430, 0.06, 'triangle', 0.06); },
     lock: function () { this.tone(120, 0.1, 'sine', 0.11); },
     clear: function (chain) {
@@ -155,50 +161,55 @@
   function layout() {
     var vw = Math.round(document.documentElement.clientWidth);
     var vh = Math.round(document.documentElement.clientHeight);
-    var hudH = hud.getBoundingClientRect().height;
-    var safeBottom = safeProbe.getBoundingClientRect().height || 0;
+    var hudH = Math.round(hud.getBoundingClientRect().height);
+    var safeBottom = Math.round(safeProbe.getBoundingClientRect().height || 0);
 
-    var padTop = hudH + 4;
-    var padBottom = safeBottom + 10;
+    var padTop = hudH;
+    var padBottom = safeBottom + 2;
     var availH = Math.max(120, vh - padTop - padBottom);
 
-    // Leave ~0.6 cell of side wall and ~1 cell for the collar and grate.
-    var cell = Math.floor(Math.min(vw / (W + 0.62), availH / (H + 1.05)));
-    cell = Math.max(10, Math.min(cell, 72));
+    // The pipe runs nearly edge to edge; the side walls take a fixed sliver
+    // rather than a share of the cell, so the playfield gets the rest.
+    var wall = Math.max(4, Math.round(vw * 0.018));
+    var cell = Math.floor(Math.min((vw - wall * 2) / W, availH / H));
+    cell = Math.max(10, Math.min(cell, 96));
 
-    var wall = Math.max(3, Math.round(cell * 0.28));
-    var collar = Math.max(7, Math.round(cell * 0.55));
-    var grate = Math.max(6, Math.round(cell * 0.45));
+    var collar = Math.max(7, Math.round(cell * 0.5));
+    var grate = Math.max(6, Math.round(cell * 0.42));
     var boardW = W * cell, boardH = H * cell;
-    var stack = boardH + collar + grate;
+
+    var dpr = Math.min(self.devicePixelRatio || 1, 2.5);
+    var same = view.cell === cell && view.vw === vw && view.vh === vh && view.dpr === dpr;
 
     view.cell = cell;
     view.wall = wall;
     view.collar = collar;
     view.grate = grate;
     view.x0 = Math.round((vw - boardW) / 2);
-    view.y0 = padTop + collar + Math.max(0, Math.round((availH - stack) / 2));
+    view.y0 = padTop + Math.max(0, Math.round((availH - boardH) / 2));
     view.vw = vw;
     view.vh = vh;
-
-    var dpr = Math.min(self.devicePixelRatio || 1, 2.5);
     view.dpr = dpr;
+
+    if (same) return; // nothing to rebuild; repainting the scene is expensive
+
     boardCv.width = Math.round(vw * dpr);
     boardCv.height = Math.round(vh * dpr);
     bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    nextCv.style.width = '52px';
-    nextCv.style.height = '26px';
-    nextCv.width = Math.round(52 * dpr);
-    nextCv.height = Math.round(26 * dpr);
+    nextCv.width = Math.round(48 * dpr);
+    nextCv.height = Math.round(24 * dpr);
     nctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    view.bg = buildBackground(vw, vh, cell, dpr);
+    view.bg = buildScene(vw, vh, cell, dpr);
+    buildSprites(cell, dpr);
     drawNext();
   }
 
-  // The tiled wall behind the pipe. Drawn once per layout, then blitted.
-  function buildBackground(vw, vh, cell, dpr) {
+  // The tiled wall and the whole static pipe — walls, collar, grate, grid.
+  // Built once per layout and blitted each frame, which is the difference
+  // between ~2000 path operations per frame and one drawImage.
+  function buildScene(vw, vh, cell, dpr) {
     var c = document.createElement('canvas');
     c.width = Math.round(vw * dpr);
     c.height = Math.round(vh * dpr);
@@ -230,7 +241,83 @@
     vig.addColorStop(1, 'rgba(0,0,0,0.62)');
     g.fillStyle = vig;
     g.fillRect(0, 0, vw, vh);
+
+    paintPipe(g, vw, vh, cell);
     return c;
+  }
+
+  // The pipe casing runs off the top and bottom of the screen, so the drain
+  // reads as continuing past the viewport instead of floating in a margin.
+  function paintPipe(ctx, vw, vh, cell) {
+    var v = view;
+    var boardW = W * cell, boardH = H * cell;
+    var outerX = v.x0 - v.wall, outerW = boardW + v.wall * 2;
+    var top = v.y0, bottom = v.y0 + boardH;
+
+    // side walls, full screen height
+    ctx.fillStyle = metal(ctx, outerX, 0, v.wall, vh);
+    ctx.fillRect(outerX, 0, v.wall, vh);
+    ctx.fillStyle = metal(ctx, v.x0 + boardW, 0, v.wall, vh);
+    ctx.fillRect(v.x0 + boardW, 0, v.wall, vh);
+
+    // pipe interior continuing above the playfield and below the grate
+    ctx.fillStyle = '#0a0f1c';
+    ctx.fillRect(v.x0, 0, boardW, top);
+    ctx.fillRect(v.x0, bottom, boardW, vh - bottom);
+
+    // the well
+    ctx.fillStyle = '#070a13';
+    ctx.fillRect(v.x0, top, boardW, boardH);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(v.x0, top, boardW, boardH);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(255,255,255,0.032)';
+    ctx.lineWidth = 1;
+    for (var c = 1; c < W; c++) {
+      ctx.beginPath();
+      ctx.moveTo(v.x0 + c * cell + 0.5, top);
+      ctx.lineTo(v.x0 + c * cell + 0.5, bottom);
+      ctx.stroke();
+    }
+    for (var r = 1; r < H; r++) {
+      ctx.beginPath();
+      ctx.moveTo(v.x0, top + r * cell + 0.5);
+      ctx.lineTo(v.x0 + boardW, top + r * cell + 0.5);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // threaded collar at the mouth
+    var collarTop = Math.max(0, top - v.collar);
+    ctx.fillStyle = metal(ctx, outerX, collarTop, outerW, top - collarTop);
+    ctx.fillRect(outerX, collarTop, outerW, top - collarTop);
+    ctx.strokeStyle = 'rgba(0,0,0,0.32)';
+    ctx.lineWidth = 1;
+    for (var th = 1; th < 3; th++) {
+      var ty = collarTop + ((top - collarTop) / 3) * th;
+      ctx.beginPath(); ctx.moveTo(outerX, ty); ctx.lineTo(outerX + outerW, ty); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(v.x0, top - Math.max(1, cell * 0.04), boardW, Math.max(1, cell * 0.04));
+
+    // drain grate below
+    ctx.fillStyle = metal(ctx, outerX, bottom, outerW, v.grate);
+    ctx.fillRect(outerX, bottom, outerW, v.grate);
+    ctx.fillStyle = 'rgba(6,9,16,0.78)';
+    var slots = 5, sw = boardW / (slots * 2 + 1);
+    for (var sI = 0; sI < slots; sI++) {
+      ctx.fillRect(v.x0 + sw * (sI * 2 + 1), bottom + v.grate * 0.28, sw, v.grate * 0.44);
+    }
+
+    // rivets down both walls
+    ctx.fillStyle = 'rgba(255,255,255,0.17)';
+    var rr = Math.max(1, v.wall * 0.22);
+    for (var y = cell * 0.9; y < vh; y += cell * 2.7) {
+      ctx.beginPath(); ctx.arc(outerX + v.wall / 2, y, rr, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(v.x0 + boardW + v.wall / 2, y, rr, 0, Math.PI * 2); ctx.fill();
+    }
   }
 
   /* ------------------------------------------------------------ painting */
@@ -372,41 +459,66 @@
     glyph(ctx, x + s / 2, y + s / 2, s, color, 0.6);
   }
 
-  // A hairball: matted core wrapped in tangled strands.
-  function drawClog(ctx, x, y, s, color, t, seed) {
+  // A hairball: a matted core buried in a thick tangle of strands. This is only
+  // ever drawn into a sprite, so it can afford to be genuinely hairy.
+  function drawClog(ctx, x, y, s, color, seed) {
     var P = PALETTE[color];
     var cx = x + s / 2, cy = y + s / 2;
-    var R = s * 0.29;
-    var wob = Math.sin(t * 0.0016 + seed) * 0.08;
+    var R = s * 0.27;
+    // Deterministic scatter per variant, so each sprite is a different tangle.
+    var n = seed * 9781 + 1;
+    var rnd = function () {
+      n = (n * 1103515245 + 12345) & 0x7fffffff;
+      return n / 0x7fffffff;
+    };
 
     ctx.save();
     ctx.lineCap = 'round';
-    // Strands curl around the ball rather than spiking straight out, which is
-    // the difference between reading as hair and reading as a sea urchin.
-    for (var i = 0; i < 22; i++) {
-      var a = (i / 22) * Math.PI * 2 + seed * 0.9 + wob;
-      var r0 = R * (0.5 + 0.35 * (((i * 5 + seed) % 3) / 3));
-      var reach = R * (0.98 + 0.4 * (((i * 7 + seed * 3) % 5) / 5));
-      var curl = 1.15 + ((i % 4) - 1.5) * 0.5;
-      ctx.strokeStyle = (i % 3) ? P.main : P.light;
-      ctx.globalAlpha = 0.32 + 0.4 * ((i % 4) / 4);
-      ctx.lineWidth = Math.max(1, s * 0.036);
+
+    // Under-layer: long wild strays that escape the clump.
+    for (var w = 0; w < 20; w++) {
+      var aw = rnd() * Math.PI * 2;
+      var reachW = R * (1.25 + rnd() * 0.5);
+      var curlW = (rnd() - 0.5) * 3.2;
+      ctx.strokeStyle = P.dark;
+      ctx.globalAlpha = 0.3 + rnd() * 0.3;
+      ctx.lineWidth = Math.max(0.7, s * 0.022);
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(aw) * R * 0.4, cy + Math.sin(aw) * R * 0.4);
+      ctx.quadraticCurveTo(
+        cx + Math.cos(aw + curlW * 0.4) * reachW * 1.2,
+        cy + Math.sin(aw + curlW * 0.4) * reachW * 1.2,
+        cx + Math.cos(aw + curlW) * reachW,
+        cy + Math.sin(aw + curlW) * reachW);
+      ctx.stroke();
+    }
+
+    // Main tangle: strands curl around the ball rather than spiking out, which
+    // is the difference between reading as hair and reading as a sea urchin.
+    for (var i = 0; i < 46; i++) {
+      var a = (i / 46) * Math.PI * 2 + rnd() * 0.5;
+      var r0 = R * (0.35 + rnd() * 0.5);
+      var reach = R * (0.9 + rnd() * 0.55);
+      var curl = 1.0 + (rnd() - 0.5) * 1.8;
+      ctx.strokeStyle = rnd() < 0.34 ? P.light : P.main;
+      ctx.globalAlpha = 0.3 + rnd() * 0.45;
+      ctx.lineWidth = Math.max(0.8, s * (0.02 + rnd() * 0.018));
       ctx.beginPath();
       ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
       ctx.quadraticCurveTo(
-        cx + Math.cos(a + curl * 0.45) * reach * 1.16,
-        cy + Math.sin(a + curl * 0.45) * reach * 1.16,
-        cx + Math.cos(a + curl) * reach * 0.8,
-        cy + Math.sin(a + curl) * reach * 0.8);
+        cx + Math.cos(a + curl * 0.45) * reach * 1.18,
+        cy + Math.sin(a + curl * 0.45) * reach * 1.18,
+        cx + Math.cos(a + curl) * reach * 0.82,
+        cy + Math.sin(a + curl) * reach * 0.82);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
-    // matted core
+    // matted core, lumpy rather than round
     ctx.beginPath();
-    for (var k = 0; k <= 9; k++) {
-      var ang = (k / 9) * Math.PI * 2;
-      var rad = R * (0.92 + Math.sin(ang * 3 + seed + t * 0.002) * 0.12);
+    for (var k = 0; k <= 11; k++) {
+      var ang = (k / 11) * Math.PI * 2;
+      var rad = R * (0.86 + Math.sin(ang * 3 + seed) * 0.13);
       var px = cx + Math.cos(ang) * rad, py = cy + Math.sin(ang) * rad;
       if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
@@ -417,108 +529,103 @@
     g.addColorStop(1, '#16111c');
     ctx.fillStyle = g;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-    ctx.lineWidth = Math.max(1, s * 0.035);
-    ctx.stroke();
 
-    // loose hairs lying across the matted core
-    ctx.globalAlpha = 0.45;
-    ctx.lineWidth = Math.max(1, s * 0.028);
-    for (var j = 0; j < 7; j++) {
-      var a2 = j * 1.9 + seed + wob;
-      ctx.strokeStyle = (j % 2) ? P.main : P.light;
+    // hairs lying over the clump, so the core looks wound rather than drawn on
+    ctx.save();
+    ctx.clip();
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = Math.max(0.8, s * 0.02);
+    for (var j = 0; j < 22; j++) {
+      var a2 = rnd() * Math.PI * 2;
+      ctx.strokeStyle = rnd() < 0.5 ? P.main : P.light;
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a2) * R * 0.86, cy + Math.sin(a2) * R * 0.86);
-      ctx.quadraticCurveTo(cx, cy,
-        cx + Math.cos(a2 + 2.3) * R * 0.86, cy + Math.sin(a2 + 2.3) * R * 0.86);
+      ctx.moveTo(cx + Math.cos(a2) * R, cy + Math.sin(a2) * R);
+      ctx.quadraticCurveTo(
+        cx + (rnd() - 0.5) * R * 0.9, cy + (rnd() - 0.5) * R * 0.9,
+        cx + Math.cos(a2 + 1.6 + rnd()) * R, cy + Math.sin(a2 + 1.6 + rnd()) * R);
       ctx.stroke();
     }
     ctx.restore();
+    ctx.restore();
 
-    glyph(ctx, cx, cy, s, color, 0.85);
+    glyph(ctx, cx, cy, s, color, 0.8);
+  }
+
+  /* ------------------------------------------------------------- sprites */
+
+  // Every cell is one of a small fixed set of pictures, so they are drawn once
+  // per layout and blitted thereafter. Hairballs get several variants so a
+  // field of them does not look stamped.
+  var CLOG_VARIANTS = 5;
+  var sprites = { seg: null, clog: null };
+
+  function spriteCanvas(cell, dpr, paint) {
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(cell * dpr));
+    c.height = Math.max(1, Math.round(cell * dpr));
+    var g = c.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    paint(g);
+    return c;
+  }
+
+  function buildSprites(cell, dpr) {
+    var links = ['left', 'right', 'up', 'down', 'none'];
+    sprites.seg = [];
+    sprites.clog = [];
+    for (var color = 0; color < PALETTE.length; color++) {
+      var byLink = {};
+      for (var l = 0; l < links.length; l++) {
+        (function (link) {
+          byLink[link] = spriteCanvas(cell, dpr, function (g) {
+            drawSegment(g, 0, 0, cell, color, link === 'none' ? null : link);
+          });
+        })(links[l]);
+      }
+      sprites.seg.push(byLink);
+
+      var variants = [];
+      for (var v = 0; v < CLOG_VARIANTS; v++) {
+        (function (seed) {
+          variants.push(spriteCanvas(cell, dpr, function (g) {
+            drawClog(g, 0, 0, cell, color, seed);
+          }));
+        })(v + 1);
+      }
+      sprites.clog.push(variants);
+    }
+  }
+
+  function segSprite(color, link) {
+    return sprites.seg ? sprites.seg[color][link || 'none'] : null;
+  }
+
+  function clogSprite(color, i) {
+    return sprites.clog ? sprites.clog[color][i % CLOG_VARIANTS] : null;
+  }
+
+  function blit(ctx, sprite, x, y, s) {
+    if (sprite) ctx.drawImage(sprite, x, y, s, s);
   }
 
   function cellXY(c, r) {
     return { x: view.x0 + c * view.cell, y: view.y0 + r * view.cell };
   }
 
+  // Everything static about the pipe lives in the scene bitmap; only the
+  // warning frame changes from frame to frame.
   function drawPipe(t) {
-    var v = view, ctx = bctx;
-    var boardW = W * v.cell, boardH = H * v.cell;
-    var outerX = v.x0 - v.wall, outerW = boardW + v.wall * 2;
-
-    // threaded collar above the mouth of the pipe
-    ctx.fillStyle = metal(ctx, outerX, v.y0 - v.collar, outerW, v.collar);
-    roundRect(ctx, outerX - v.wall * 0.35, v.y0 - v.collar, outerW + v.wall * 0.7, v.collar,
-      [v.cell * 0.2, v.cell * 0.2, 0, 0]);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-    ctx.lineWidth = 1;
-    for (var th = 1; th < 3; th++) {
-      var ty = v.y0 - v.collar + (v.collar / 3) * th;
-      ctx.beginPath(); ctx.moveTo(outerX, ty); ctx.lineTo(outerX + outerW, ty); ctx.stroke();
-    }
-
-    // side walls
-    ctx.fillStyle = metal(ctx, outerX, v.y0, v.wall, boardH);
-    ctx.fillRect(outerX, v.y0, v.wall, boardH);
-    ctx.fillStyle = metal(ctx, v.x0 + boardW, v.y0, v.wall, boardH);
-    ctx.fillRect(v.x0 + boardW, v.y0, v.wall, boardH);
-
-    // rivets
-    ctx.fillStyle = 'rgba(255,255,255,0.16)';
-    for (var y = v.y0 + v.cell * 0.9; y < v.y0 + boardH; y += v.cell * 2.7) {
-      ctx.beginPath(); ctx.arc(outerX + v.wall / 2, y, Math.max(1, v.wall * 0.2), 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(v.x0 + boardW + v.wall / 2, y, Math.max(1, v.wall * 0.2), 0, Math.PI * 2); ctx.fill();
-    }
-
-    // the well itself
-    ctx.fillStyle = '#070a13';
-    ctx.fillRect(v.x0, v.y0, boardW, boardH);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(v.x0, v.y0, boardW, boardH);
-    ctx.clip();
-    ctx.strokeStyle = 'rgba(255,255,255,0.032)';
-    ctx.lineWidth = 1;
-    for (var c = 1; c < W; c++) {
-      ctx.beginPath();
-      ctx.moveTo(v.x0 + c * v.cell + 0.5, v.y0);
-      ctx.lineTo(v.x0 + c * v.cell + 0.5, v.y0 + boardH);
-      ctx.stroke();
-    }
-    for (var r = 1; r < H; r++) {
-      ctx.beginPath();
-      ctx.moveTo(v.x0, v.y0 + r * v.cell + 0.5);
-      ctx.lineTo(v.x0 + boardW, v.y0 + r * v.cell + 0.5);
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    // drain grate at the bottom
-    var gy = v.y0 + boardH;
-    ctx.fillStyle = metal(ctx, outerX, gy, outerW, v.grate);
-    roundRect(ctx, outerX - v.wall * 0.35, gy, outerW + v.wall * 0.7, v.grate,
-      [0, 0, v.cell * 0.22, v.cell * 0.22]);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(6,9,16,0.75)';
-    var slots = 5, sw = boardW / (slots * 2 + 1);
-    for (var sI = 0; sI < slots; sI++) {
-      ctx.fillRect(v.x0 + sw * (sI * 2 + 1), gy + v.grate * 0.28, sw, v.grate * 0.44);
-    }
-
-    // the neck is filling up
     var choked = false;
     for (var i = 0; i < W * 2; i++) if (S.board[i]) { choked = true; break; }
-    if (choked && S.phase !== 'gameover') {
-      var pulse = 0.3 + Math.sin(t * 0.006) * 0.2;
-      ctx.strokeStyle = 'rgba(251,113,133,' + pulse.toFixed(3) + ')';
-      ctx.lineWidth = Math.max(2, v.cell * 0.1);
-      ctx.strokeRect(v.x0 + 1, v.y0 + 1, boardW - 2, v.cell * 2 - 2);
-    }
+    if (!choked || S.phase === 'gameover') return;
+    var ctx = bctx, v = view;
+    var pulse = 0.3 + Math.sin(t * 0.006) * 0.2;
+    ctx.strokeStyle = 'rgba(251,113,133,' + pulse.toFixed(3) + ')';
+    ctx.lineWidth = Math.max(2, v.cell * 0.1);
+    ctx.strokeRect(v.x0 + 1, v.y0 + 1, W * v.cell - 2, v.cell * 2 - 2);
   }
 
-  function drawBoard(t) {
+  function drawBoard() {
     var ctx = bctx, s = view.cell;
     var clearing = S.clearSet;
     var p = clearing ? Math.min(1, S.clearTimer / CLEAR_MS) : 0;
@@ -526,31 +633,33 @@
     for (var i = 0; i < S.board.length; i++) {
       var cell = S.board[i];
       if (!cell) continue;
-      var pos = cellXY(C.colOf(i), C.rowOf(i));
-      var dissolving = clearing && clearing.has(i);
+      var x = view.x0 + C.colOf(i) * s;
+      var y = view.y0 + C.rowOf(i) * s;
+      var sprite = cell.type === 'clog'
+        ? clogSprite(cell.color, i)
+        : segSprite(cell.color, cell.link);
+
+      if (!clearing || !clearing.has(i)) {
+        blit(ctx, sprite, x, y, s);
+        continue;
+      }
 
       ctx.save();
-      if (dissolving) {
-        ctx.globalAlpha = 1 - p * 0.85;
-        ctx.translate(pos.x + s / 2, pos.y + s / 2);
-        var k = 1 + p * 0.25;
-        ctx.scale(k, k);
-        ctx.translate(-(pos.x + s / 2), -(pos.y + s / 2));
-      }
-      if (cell.type === 'clog') drawClog(ctx, pos.x, pos.y, s, cell.color, t, i);
-      else drawSegment(ctx, pos.x, pos.y, s, cell.color, cell.link);
+      ctx.globalAlpha = 1 - p * 0.85;
+      var k = 1 + p * 0.25;
+      ctx.translate(x + s / 2, y + s / 2);
+      ctx.scale(k, k);
+      blit(ctx, sprite, -s / 2, -s / 2, s);
       ctx.restore();
 
-      if (dissolving) {
-        ctx.save();
-        ctx.globalAlpha = (1 - p) * 0.85;
-        ctx.strokeStyle = '#dff9ff';
-        ctx.lineWidth = Math.max(1, s * 0.08);
-        ctx.beginPath();
-        ctx.arc(pos.x + s / 2, pos.y + s / 2, s * (0.25 + p * 0.5), 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
+      ctx.save();
+      ctx.globalAlpha = (1 - p) * 0.85;
+      ctx.strokeStyle = '#dff9ff';
+      ctx.lineWidth = Math.max(1, s * 0.08);
+      ctx.beginPath();
+      ctx.arc(x + s / 2, y + s / 2, s * (0.25 + p * 0.5), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
@@ -586,7 +695,7 @@
     cells.forEach(function (cl) {
       if (cl.r < 0) return;
       var pos = cellXY(cl.c, cl.r);
-      drawSegment(ctx, pos.x, pos.y, s, cl.color, cl.link);
+      blit(ctx, segSprite(cl.color, cl.link), pos.x, pos.y, s);
     });
   }
 
@@ -626,11 +735,11 @@
 
   function drawNext() {
     var ctx = nctx;
-    ctx.clearRect(0, 0, 52, 26);
+    ctx.clearRect(0, 0, 48, 24);
     if (!S.nextColors) return;
-    var s = 26;
-    drawSegment(ctx, 0, 0, s, S.nextColors[0], 'right');
-    drawSegment(ctx, s, 0, s, S.nextColors[1], 'left');
+    var s = 24;
+    blit(ctx, segSprite(S.nextColors[0], 'right'), 0, 0, s);
+    blit(ctx, segSprite(S.nextColors[1], 'left'), s, 0, s);
   }
 
   /* ------------------------------------------------- win / lose effects */
@@ -798,7 +907,7 @@
     bctx.beginPath();
     bctx.rect(view.x0, view.y0, W * view.cell, H * view.cell);
     bctx.clip();
-    drawBoard(t);
+    drawBoard();
     drawPiece();
     drawHint();
     drawToast();
@@ -810,11 +919,14 @@
 
   /* ----------------------------------------------------------- game flow */
 
+  var hudShown = { score: -1, best: -1, level: -1, clogs: -1 };
+
   function refreshHUD() {
-    $('hud-score').textContent = S.score;
-    $('hud-best').textContent = S.best;
-    $('hud-level').textContent = S.level;
-    $('hud-clogs').textContent = C.countClogs(S.board);
+    var clogs = C.countClogs(S.board);
+    if (S.score !== hudShown.score) { $('hud-score').textContent = hudShown.score = S.score; }
+    if (S.best !== hudShown.best) { $('hud-best').textContent = hudShown.best = S.best; }
+    if (S.level !== hudShown.level) { $('hud-level').textContent = hudShown.level = S.level; }
+    if (clogs !== hudShown.clogs) { $('hud-clogs').textContent = hudShown.clogs = clogs; }
   }
 
   function show(id) { $(id).classList.remove('hidden'); }
@@ -1034,7 +1146,7 @@
   }
 
   function moveToward(col) {
-    if (!playing()) return;
+    if (!playing() || S.piece.c === col) return;
     var guard = W;
     while (S.piece.c !== col && guard-- > 0) {
       var next = C.tryMove(S.board, S.piece, col > S.piece.c ? 1 : -1, 0);
@@ -1047,7 +1159,7 @@
 
   // Follows the finger downward. Never lifts a piece back up.
   function dropToRow(row) {
-    if (!playing()) return;
+    if (!playing() || S.piece.r >= row) return;
     var guard = H;
     while (S.piece.r < row && guard-- > 0) {
       var next = C.tryMove(S.board, S.piece, 0, 1);
@@ -1059,6 +1171,14 @@
       S.fallTimer = 0;
     }
     refreshHUD();
+  }
+
+  // Pointer events arrive far faster than the game can use them; skip the work
+  // entirely when the finger has not crossed into a new cell.
+  function steer(col, row) {
+    if (!playing()) return;
+    if (col !== S.piece.c) moveToward(col);
+    if (row > S.piece.r) dropToRow(row);
   }
 
   function rotate(dir) {
@@ -1140,10 +1260,9 @@
       return;
     }
 
-    moveToward(Math.max(0, Math.min(W - 1, gesture.col0 + Math.round(dx / view.cell))));
-    if (dy > view.cell * 0.5) {
-      dropToRow(gesture.row0 + Math.floor(dy / view.cell));
-    }
+    steer(
+      Math.max(0, Math.min(W - 1, gesture.col0 + Math.round(dx / view.cell))),
+      dy > view.cell * 0.5 ? gesture.row0 + Math.floor(dy / view.cell) : -1);
   }, { passive: false });
 
   function endGesture(e) {

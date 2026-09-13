@@ -57,7 +57,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: calc(var(--safe-top) + 6px) 12px 7px;
+  padding: calc(var(--safe-top) + 4px) 11px 5px;
   background: linear-gradient(180deg, rgba(9, 12, 24, 0.94) 60%, rgba(9, 12, 24, 0));
   pointer-events: none; /* the pause button re-enables it for itself */
 }
@@ -67,7 +67,7 @@ body {
 .hud-end { align-items: flex-end; }
 
 .hud-score {
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -89,14 +89,14 @@ body {
   font-weight: 800;
 }
 
-#next { display: block; width: 52px; height: 26px; }
+#next { display: block; width: 48px; height: 24px; }
 
 .icon-btn {
   pointer-events: auto;
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  font-size: 12px;
+  width: 36px;
+  height: 36px;
+  font-size: 11px;
   letter-spacing: 1px;
   line-height: 1;
   color: var(--text);
