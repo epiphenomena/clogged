@@ -334,6 +334,10 @@
   // perching on the shoulders of a tall pile where nothing can be built under
   // them. Ties within a couple of rows keep the column from being predictable.
   var DRIP_DEPTH_SLACK = 2;
+  // A falling clog can catch on something it brushes past on the way down, but
+  // only low enough in the pipe that a line can still be built through it.
+  var DRIP_SNAG_MIN_ROW = 8;
+  var DRIP_SNAG_CHANCE = 0.5;
 
   function dripColumn(board, rand) {
     rand = rand || Math.random;
@@ -350,6 +354,30 @@
       if (landings[k] >= deepest - DRIP_DEPTH_SLACK) near.push(k);
     }
     return near[(rand() * near.length) | 0];
+  }
+
+  // Every row on the way down where the clog would be rubbing against
+  // something to its left or right, and is still low enough to be worth having.
+  function dripSnagRows(board, col, landing) {
+    var rows = [];
+    for (var r = DRIP_SNAG_MIN_ROW; r < landing; r++) {
+      if (board[idx(col, r)]) continue;
+      var left = col > 0 && board[idx(col - 1, r)];
+      var right = col < W - 1 && board[idx(col + 1, r)];
+      if (left || right) rows.push(r);
+    }
+    return rows;
+  }
+
+  // Where a falling clog actually ends up: usually resting on the stack, but
+  // sometimes wedged partway down against a neighbour.
+  function dripTarget(board, col, rand) {
+    rand = rand || Math.random;
+    var landing = dripLanding(board, col);
+    if (landing < 0) return -1;
+    var snags = dripSnagRows(board, col, landing);
+    if (!snags.length || rand() >= DRIP_SNAG_CHANCE) return landing;
+    return snags[(rand() * snags.length) | 0];
   }
 
   function placeClog(board, col, row, color) {
@@ -449,6 +477,8 @@
     seedLevel: seedLevel, clogTotal: clogTotal, countClogs: countClogs,
     clogSeedCount: clogSeedCount, dripEvery: dripEvery, balancedColors: balancedColors,
     dripLanding: dripLanding, dripColumn: dripColumn, placeClog: placeClog,
+    dripTarget: dripTarget, dripSnagRows: dripSnagRows,
+    DRIP_SNAG_MIN_ROW: DRIP_SNAG_MIN_ROW, DRIP_SNAG_CHANCE: DRIP_SNAG_CHANCE,
     shuffle: shuffle,
     runThrough: runThrough, fallInterval: fallInterval,
     seedTopRow: seedTopRow, pressureStep: pressureStep, pressureGrace: pressureGrace,

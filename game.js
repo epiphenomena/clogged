@@ -163,6 +163,8 @@
   };
 
   var Sc = self.Scores;
+  var Sv = self.Save;
+  var SAVE_LIMITS = { cells: W * H, cols: W, colors: C.COLORS, maxLevel: C.MAX_LEVEL };
   var history = Sc.seedBest(Sc.sanitize(Store.get('history', null)), S.best);
 
   var view = { cell: 24, wall: 7, collar: 13, grate: 11, x0: 0, y0: 0, vw: 0, vh: 0, dpr: 1, bg: null };
@@ -986,9 +988,37 @@
     }
   }
 
+  // Written at the start of every coupling and whenever the game is put down,
+  // so a tab killed in the background can be picked up where it left off.
+  function saveGame() {
+    if (S.phase !== 'play' || !S.piece) return;
+    Store.set('save', Sv.encode({
+      level: S.level,
+      score: S.score,
+      board: S.board,
+      piece: S.piece,
+      next: S.nextColors,
+      pending: S.pending,
+      sinceDrip: S.sinceDrip,
+      elapsed: S.levelElapsed,
+      pressure: S.pressure,
+      locks: S.locks,
+      recorded: S.recorded
+    }));
+  }
+
+  function clearSave() {
+    try { localStorage.removeItem('clogged.save'); } catch (e) { /* private mode */ }
+  }
+
+  function loadSave() {
+    return Sv.decode(Store.get('save', null), SAVE_LIMITS);
+  }
+
   // A run ends when it tops out or when its score is about to be discarded.
   // Recorded once, so retrying after a game over does not file it twice.
   function endRun() {
+    clearSave();
     saveBest();
     if (S.score <= 0 || S.recorded) return;
     S.recorded = true;
@@ -1044,6 +1074,7 @@
       return;
     }
     S.phase = 'play';
+    saveGame();
   }
 
   function gameOver() {
@@ -1095,7 +1126,7 @@
   // Sends the next queued clog washing down a column of its own choosing.
   function startDrip() {
     var col = C.dripColumn(S.board, Math.random);
-    var target = col < 0 ? -1 : C.dripLanding(S.board, col);
+    var target = col < 0 ? -1 : C.dripTarget(S.board, col, Math.random);
     S.sinceDrip = 0;
     if (target < 0) return false;   // nowhere for it to go; try again later
     S.drip = { col: col, color: S.pending.shift(), row: -1, target: target };
@@ -1386,6 +1417,7 @@
   // behind an overlay the player is still reading.
   function pauseGame() {
     if (!inPlay()) return;
+    saveGame();   // before the phase changes, or it would refuse to write
     S.resumePhase = S.phase;
     S.phase = 'paused';
     gesture = null;
@@ -1617,7 +1649,54 @@
   function closeScores() {
     hideTip();
     hide('ov-scores');
-    show(S.scoresReturn || 'ov-menu');
+    var back = S.scoresReturn || 'ov-menu';
+    // The title screen always reflects what is actually in storage when it
+    // comes back into view.
+    if (back === 'ov-menu') refreshResumeButton();
+    show(back);
+  }
+
+  // Picks a suspended game back up. Everything comes from a record that has
+  // already been validated, and it lands paused so the player is not thrown
+  // straight back under a falling coupling.
+  function resumeSaved() {
+    var saved = loadSave();
+    if (!saved) { refreshResumeButton(); return; }
+    S.level = saved.level;
+    S.score = saved.score;
+    S.board = saved.board;
+    S.piece = saved.piece;
+    S.nextColors = saved.next;
+    S.pending = saved.pending;
+    S.sinceDrip = saved.sinceDrip;
+    S.levelElapsed = saved.elapsed;
+    S.pressure = saved.pressure;
+    S.locks = saved.locks;
+    S.recorded = saved.recorded;
+    S.chain = 0;
+    S.clearSet = null;
+    S.drip = null;
+    S.toast = null;
+    S.fx = null;
+    S.hint = 0;
+    document.body.classList.remove('fx-active');
+    hideAllOverlays();
+    drawNext();
+    refreshHUD();
+    S.phase = 'play';
+    if (!S.piece) spawn();
+    pauseGame();
+  }
+
+  function refreshResumeButton() {
+    var saved = loadSave();
+    var btn = $('btn-resume-saved');
+    if (saved) {
+      $('resume-sub').textContent = Sv.describe(saved);
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
   }
 
   function updateLevelPicker() {
@@ -1628,6 +1707,7 @@
 
   function toMenu() {
     endRun();
+    refreshResumeButton();
     S.phase = 'menu';
     S.piece = null;
     S.fx = null;
@@ -1655,7 +1735,11 @@
 
   $('btn-start').addEventListener('click', function () {
     Sound.unlock();
-    startLevel(S.startLevel, false);
+    startLevel(S.startLevel, false);   // ends any suspended run, clearing its save
+  });
+  $('btn-resume-saved').addEventListener('click', function () {
+    Sound.unlock();
+    resumeSaved();
   });
   $('btn-resume').addEventListener('click', resumeGame);
   // Banks the run, then hands back the title screen so the next game can start
@@ -1702,7 +1786,7 @@
     if (document.hidden) pauseGame();
   });
   self.addEventListener('blur', pauseGame);
-  self.addEventListener('pagehide', pauseGame);
+  self.addEventListener('pagehide', function () { saveGame(); pauseGame(); });
 
   /* ----------------------------------------------------------------- boot */
 
@@ -1711,6 +1795,7 @@
   self.addEventListener('orientationchange', function () { setTimeout(layout, 120); });
 
   syncSoundButton();
+  refreshResumeButton();   // offer a suspended game straight away, if one is waiting
   S.board = C.seedLevel(S.startLevel).board;
   updateLevelPicker();
   refreshHUD();

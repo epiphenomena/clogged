@@ -313,6 +313,57 @@ function lcg(seed) {
   eq('when the pipe is packed it picks the deepest column',
     C.dripColumn(board3, lcg(3)), 6);
 
+  // Catching on the way down: a clog brushing past a neighbour can wedge there.
+  {
+    const b7 = C.makeBoard();
+    // A tower in column 4 gives column 3 something to rub against on the way.
+    for (let r = 9; r < C.H; r++) put(b7, 4, r, seg(1));
+    const landing = C.dripLanding(b7, 3);
+    const snags = C.dripSnagRows(b7, 3, landing);
+    check('there are places to catch on', snags.length > 0, 'snags=' + snags.join(','));
+    check('every catch point is beside something',
+      snags.every((r) => b7[C.idx(4, r)] || (r > 0 && b7[C.idx(2, r)])), snags.join(','));
+    check('no catch point is above the reachable band',
+      snags.every((r) => r >= C.DRIP_SNAG_MIN_ROW), snags.join(','));
+    check('no catch point is at or below the resting row',
+      snags.every((r) => r < landing), 'landing=' + landing + ' snags=' + snags.join(','));
+
+    // Over many arrivals it should sometimes catch and sometimes fall through.
+    const seen = new Set();
+    for (let i = 1; i < 200; i++) seen.add(C.dripTarget(b7, 3, lcg(i * 7919)));
+    check('clogs sometimes fall all the way', seen.has(landing),
+      'targets=' + [...seen].join(','));
+    check('clogs sometimes catch partway down',
+      [...seen].some((r) => r < landing), 'targets=' + [...seen].join(','));
+    check('a caught clog is never above the reachable band',
+      [...seen].every((r) => r >= C.DRIP_SNAG_MIN_ROW), [...seen].join(','));
+  }
+  {
+    // Nothing to brush against: it must fall all the way, every time.
+    const b8 = C.makeBoard();
+    put(b8, 6, C.H - 1, clog(2));
+    const landing = C.dripLanding(b8, 6);
+    eq('an empty neighbourhood offers nothing to catch on',
+      C.dripSnagRows(b8, 6, landing).length, 0);
+    const targets = new Set();
+    for (let i = 1; i < 60; i++) targets.add(C.dripTarget(b8, 6, lcg(i * 7919)));
+    check('with nothing alongside it always lands on the stack',
+      targets.size === 1 && targets.has(landing), [...targets].join(','));
+  }
+  {
+    // High neighbours are not catch points: a clog up there could never be cleared.
+    const b9 = C.makeBoard();
+    for (let r = 0; r < 6; r++) put(b9, 2, r, seg(0));
+    const landing = C.dripLanding(b9, 1);
+    eq('a clog will not catch high up in the pipe',
+      C.dripSnagRows(b9, 1, landing).length, 0);
+  }
+  {
+    const b10 = C.makeBoard();
+    for (let r = 0; r < C.H; r++) put(b10, 0, r, seg(0));
+    eq('a full column has no target', C.dripTarget(b10, 0, lcg(1)), -1);
+  }
+
   const board4 = C.makeBoard();
   check('placing an arrival works', C.placeClog(board4, 2, 9, 1));
   eq('the arrival becomes a clog', board4[C.idx(2, 9)].type, 'clog');

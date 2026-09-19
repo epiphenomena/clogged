@@ -31,8 +31,11 @@ Three details make or break a plan:
 - **Clogs keep coming.** A level's quota is not all sitting there at the start.
   Later levels open with a readable dozen and wash the rest down the pipe as you
   play — one every few couplings, aimed at the deepest column so it settles low.
-  The counter in the header is what is *left*, arrived or not, so a level is not
-  over until the queue is empty too.
+  Sometimes one catches on something it brushes past on the way down and wedges
+  there instead, leaving an overhang to build under; it will only ever snag low
+  enough in the pipe that a line can still be run through it. The counter in the
+  header is what is *left*, arrived or not, so a level is not over until the
+  queue is empty too.
 - **Pressure builds, eventually.** Nothing changes for the first minute — longer
   on a big level, which honestly takes longer to clear. After that the couplings
   speed up a few percent every 30 seconds, topping out around 1.7× after five
@@ -78,6 +81,24 @@ dashed outline previews where it will land.
 Each colour also carries a shape — ring, bar, cross — so the game is playable
 without relying on colour vision.
 
+## Picking up where you left off
+
+A game in progress is written to the device whenever a coupling starts falling
+and whenever you put the game down — pausing, switching tabs, switching apps.
+If the phone kills the tab in the background, the title screen offers **Resume
+game** with the level and score it is holding, and picks up paused so you are
+not dropped straight back under a falling coupling.
+
+Starting a new game or losing clears it, so a finished run never lingers as a
+ghost. Anything read back from storage is validated field by field first: a
+half-written record, a save from an older build, or something hand-edited is
+discarded rather than booting the game into a broken state.
+
+One limit worth knowing: the snapshot is skipped while a cascade is resolving,
+because the board is briefly mid-clear and inconsistent. Put the game down at
+that exact moment and it resumes from the start of the current coupling
+instead — a second or two of progress, never the run.
+
 ## Pausing
 
 The pause button sits in the top-right corner, and the menu behind it offers
@@ -120,21 +141,25 @@ with no DOM access, so they can be tested directly:
 ```sh
 node test/core.test.js    # board rules
 node test/scores.test.js  # score history
+node test/save.test.js    # suspended-game snapshots
 node test/smoke.test.js   # boots the real game.js against a stubbed DOM and plays it
 ```
 
 The first covers match detection, coupling splitting, gravity, cascades, rotation
-kicks, level seeding, and the pressure ramp; the second covers recording, the two
-caps, ranking, and surviving junk in storage. The third stubs enough DOM and
+kicks, level seeding, arrivals, and the pressure ramp; the second covers
+recording, the two caps, ranking, and surviving junk in storage; the third covers
+snapshot round-trips and every way a stored record can be malformed. The last
+stubs enough DOM and
 canvas for [`game.js`](game.js) to run headlessly, then drives it with a greedy
 player that clears levels — so wiring and state-machine regressions get caught
-without a browser. All three are plain node scripts with no dependencies; run
+without a browser. All four are plain node scripts with no dependencies; run
 them before you push.
 
 | File | What's in it |
 | --- | --- |
 | `core.js` | Board rules — matching, gravity, cascades, seeding, arrivals, speed |
 | `scores.js` | Score history — the rolling window and the all-time table |
+| `save.js` | Suspended-game snapshots, and the validation that guards them |
 | `game.js` | Canvas rendering, gestures, game loop, scoring, effects |
 | `style.css` | Layout and theming, mobile-first |
 | `sw.js` | Offline fallback (see the caching note above) |

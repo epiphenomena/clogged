@@ -173,8 +173,10 @@ Math.random = () => ((rngState = (rngState * 1664525 + 1013904223) >>> 0) / 4294
 
 global.self.Core = require(path.join(ROOT, 'core.js'));
 global.self.Scores = require(path.join(ROOT, 'scores.js'));
+global.self.Save = require(path.join(ROOT, 'save.js'));
 const C = global.self.Core;
 const Sc = global.self.Scores;
+const Sv = global.self.Save;
 
 /* ------------------------------------------------------------------ boot */
 require(path.join(ROOT, 'game.js'));
@@ -648,6 +650,119 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
 
   if (visible('ov-gameover')) el('btn-menu').fire('click');
   else { el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
+}
+
+/* ---------------------------------------------------------- suspended games */
+{
+  const LIMITS = { cells: C.W * C.H, cols: C.W, colors: C.COLORS, maxLevel: C.MAX_LEVEL };
+  const stored = () => Sv.decode(JSON.parse(store.get('clogged.save') || 'null'), LIMITS);
+
+  startAt(6);
+  for (let i = 0; i < 40; i++) tick(16);
+  const mid = stored();
+  check('a game in progress is written down', !!mid,
+    'raw=' + String(store.get('clogged.save')).slice(0, 40));
+  check('the snapshot knows the level', mid && mid.level === 6, 'level=' + (mid && mid.level));
+  check('the snapshot carries a board',
+    mid && mid.board.length === C.W * C.H);
+  check('the snapshot keeps the clogs',
+    mid && C.countClogs(mid.board) > 0, 'clogs=' + (mid && C.countClogs(mid.board)));
+  check('the snapshot carries the queue', mid && Array.isArray(mid.pending));
+  check('the snapshot has a coupling in play', mid && !!mid.piece);
+
+  // Play on, then pause: the snapshot must move with the game.
+  for (let i = 0; i < 12; i++) { global.document.fire('keydown', { key: ' ' }); tick(16); }
+  for (let i = 0; i < 60; i++) tick(16);
+  el('btn-pause').fire('click');
+  const paused = stored();
+  check('pausing refreshes the snapshot', !!paused);
+  check('the refreshed snapshot moved on',
+    paused && mid && (paused.score !== mid.score || paused.locks !== mid.locks),
+    'locks ' + (mid && mid.locks) + ' -> ' + (paused && paused.locks));
+
+  // Pausing must write a *fresh* snapshot. Without this the assertion above is
+  // satisfied by the one written when the coupling spawned, and a pause that
+  // silently records nothing looks identical to one that works.
+  el('btn-resume').fire('click');
+  // Wait for a fresh coupling, so the soft drops below cannot land it and tip
+  // the game into a cascade, where the board is briefly inconsistent and no
+  // snapshot is taken.
+  pendingSpawn = false;
+  for (let i = 0; i < 4000 && !pendingSpawn; i++) tick(16);
+  for (let i = 0; i < 3; i++) { global.document.fire('keydown', { key: 'ArrowDown' }); tick(16); }
+  const liveNow = Number(el('hud-score').textContent);
+  const staleSnapshot = stored();
+  check('soft dropping moved the score past the last snapshot',
+    !!staleSnapshot && liveNow > staleSnapshot.score,
+    'live=' + liveNow + ' snapshot=' + (staleSnapshot && staleSnapshot.score));
+  el('btn-pause').fire('click');
+  const fresh = stored();
+  check('pausing records the score as it stands right now',
+    !!fresh && fresh.score === liveNow,
+    'snapshot=' + (fresh && fresh.score) + ' live=' + liveNow);
+
+  // Losing focus writes one too.
+  el('btn-resume').fire('click');
+  for (let i = 0; i < 30; i++) tick(16);
+  global.fireWindow('blur');
+  check('losing focus writes a snapshot', !!stored());
+
+  // Resuming restores the run and leaves it paused, not mid-fall.
+  const before = stored();
+  check('there is a snapshot to restore from', !!before);
+  el('btn-new-game').fire('click');   // banks the run and drops its save
+  check('abandoning a run clears its snapshot', stored() === null,
+    'raw=' + String(store.get('clogged.save')).slice(0, 40));
+
+  // Put a snapshot back and resume from the title screen.
+  // The title screen re-reads storage whenever it comes back into view.
+  el('btn-menu').fire('click');
+  if (before) store.set('clogged.save', JSON.stringify(Sv.encode({
+    level: before.level, score: before.score, board: before.board, piece: before.piece,
+    next: before.next, pending: before.pending, sinceDrip: before.sinceDrip,
+    elapsed: before.elapsed, pressure: before.pressure, locks: before.locks,
+    recorded: before.recorded
+  })));
+  el('btn-scores').fire('click');
+  el('btn-scores-back').fire('click');
+  check('the resume button appears when a game is waiting',
+    !el('btn-resume-saved').classes.has('hidden'));
+  check('the resume button says what it resumes',
+    /Level \d+/.test(el('resume-sub').textContent), el('resume-sub').textContent);
+
+  el('btn-resume-saved').fire('click');
+  check('resuming lands on the pause menu, not mid-fall', visible('ov-pause'));
+  check('the restored score is back',
+    !!before && Number(el('hud-score').textContent) === before.score,
+    el('hud-score').textContent + ' want=' + (before && before.score));
+  check('the restored level is back',
+    !!before && Number(el('hud-level').textContent) === before.level,
+    el('hud-level').textContent + ' want=' + (before && before.level));
+  const frozenOnResume = el('hud-score').textContent;
+  for (let i = 0; i < 120; i++) tick(16);
+  check('a resumed game waits for the player',
+    el('hud-score').textContent === frozenOnResume);
+
+  el('btn-resume').fire('click');
+  for (let i = 0; i < 60; i++) tick(16);
+  check('a resumed game plays on', !visible('ov-pause'));
+  check('the resumed board still has its clogs',
+    C.countClogs(liveBoard) + Number(el('hud-clogs').textContent) > 0);
+
+  // A corrupt record must never boot the game into a broken state.
+  el('btn-pause').fire('click');
+  el('btn-new-game').fire('click');
+  store.set('clogged.save', '{"v":2,"board":"nonsense"}');
+  el('btn-scores').fire('click');
+  el('btn-scores-back').fire('click');
+  check('a corrupt snapshot offers no resume',
+    el('btn-resume-saved').classes.has('hidden'));
+  store.set('clogged.save', 'not json at all');
+  el('btn-scores').fire('click');
+  el('btn-scores-back').fire('click');
+  check('unparseable storage offers no resume',
+    el('btn-resume-saved').classes.has('hidden'));
+  store.delete('clogged.save');
 }
 
 /* ---------------------------------------------------------------- pressure */
