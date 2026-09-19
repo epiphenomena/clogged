@@ -220,8 +220,14 @@ check('next preview is sized', el('next').width > 0, 'width=' + el('next').width
 let liveBoard = null;
 let pendingSpawn = false;
 let liveColors = [0, 1];
+// The player simulates placements on throwaway copies; only the game's own
+// calls identify the real board.
+let simulating = false;
 const _find = C.findMatches;
-C.findMatches = function (board, min) { liveBoard = board; return _find(board, min); };
+C.findMatches = function (board, min) {
+  if (!simulating) liveBoard = board;
+  return _find(board, min);
+};
 // A signature slip here fails silently: called with the wrong argument order,
 // pressureStep just returns 0 forever and the ramp quietly stops existing.
 let pressureCalls = [];
@@ -236,6 +242,14 @@ C.lockPiece = function (board, piece) { lockCount++; return _lockPiece(board, pi
 let lastRotateDir = 0;
 const _rotate = C.tryRotate;
 C.tryRotate = function (board, piece, dir) { lastRotateDir = dir; return _rotate(board, piece, dir); };
+// Catch the board the moment a level is built, so it is accurate before the
+// first piece has even landed.
+const _seed = C.seedLevel;
+C.seedLevel = function (level, rand) {
+  const built = _seed(level, rand);
+  if (!simulating) liveBoard = built.board;
+  return built;
+};
 const _spawn = C.spawnPiece;
 C.spawnPiece = function (colors) { pendingSpawn = true; liveColors = colors.slice(); return _spawn(colors); };
 
@@ -302,6 +316,7 @@ function shapeCost(b) {
 function bestPlacement(board, colors) {
   const startClogs = C.countClogs(board);
   let best = null;
+  simulating = true;
   for (let orient = 0; orient < 4; orient++) {
     const r0 = orient === 1 ? 1 : 0;
     for (let col = 0; col < C.W; col++) {
@@ -319,6 +334,7 @@ function bestPlacement(board, colors) {
       if (!best || score > best.score) best = { score, orient, col };
     }
   }
+  simulating = false;
   return best;
 }
 
@@ -360,7 +376,7 @@ function startAt(level) {
 
 startAt(0);
 check('starting hides the menu', !visible('ov-menu'));
-check('level 0 seeds four grime', el('hud-clogs').textContent === '4',
+check('level 0 seeds four clogs', el('hud-clogs').textContent === '4',
   'clogs=' + el('hud-clogs').textContent);
 
 // The greedy player is not a great player: it loses some runs outright. Retry
@@ -397,8 +413,9 @@ check('next level advances the counter', el('hud-level').textContent === '1',
 check('next level keeps the running score',
   Number(el('hud-score').textContent) >= scoreAfterL0,
   'before=' + scoreAfterL0 + ' after=' + el('hud-score').textContent);
-check('next level reseeds grime', el('hud-clogs').textContent === '8',
-  'clogs=' + el('hud-clogs').textContent);
+check('next level reseeds its clogs',
+  el('hud-clogs').textContent === String(C.clogTotal(1)),
+  'clogs=' + el('hud-clogs').textContent + ' want=' + C.clogTotal(1));
 check('the HUD comes back for the next level',
   !global.document.body.classes.has('fx-active'));
 
@@ -563,6 +580,76 @@ check('retry restarts at the same level', el('hud-level').textContent === '20',
   el('hud-level').textContent);
 check('retry clears the game-over overlay', !visible('ov-gameover'));
 
+/* ------------------------------------------------------------ clog arrivals */
+{
+  // A hard level holds most of its clogs back and washes them in during play.
+  startAt(12);
+  const total = C.clogTotal(12);
+  check('the HUD counts clogs still to come',
+    Number(el('hud-clogs').textContent) === total,
+    el('hud-clogs').textContent + ' want=' + total);
+  check('the board opens with only a handful of them',
+    liveBoard && C.countClogs(liveBoard) === C.clogSeedCount(12),
+    'on board=' + (liveBoard ? C.countClogs(liveBoard) : '?'));
+  check('a hard level holds some back', C.clogSeedCount(12) < total,
+    C.clogSeedCount(12) + ' of ' + total);
+
+  // Play on: arrivals should land and become part of the board.
+  const onBoardAtStart = C.countClogs(liveBoard);
+  let sawMore = false, frames = 0;
+  pendingSpawn = false;
+  while (frames < 40000 && !visible('ov-gameover') && !visible('ov-clear')) {
+    if (pendingSpawn && liveBoard) {
+      pendingSpawn = false;
+      const plan = bestPlacement(liveBoard, liveColors);
+      if (plan) driveMove(plan);
+    }
+    tick(16);
+    frames++;
+    if (C.countClogs(liveBoard) > onBoardAtStart) { sawMore = true; break; }
+  }
+  check('clogs wash in while the level is played', sawMore,
+    'started=' + onBoardAtStart + ' now=' + C.countClogs(liveBoard));
+  check('arrivals land as clogs, not as couplings',
+    liveBoard.filter((c) => c && c.type === 'clog').length > 0);
+
+  // They must settle low rather than perch on top of a stack.
+  const highest = liveBoard.reduce((best, cell, i) =>
+    cell && cell.type === 'clog' ? Math.min(best, C.rowOf(i)) : best, C.H);
+  check('arrivals do not stack up near the ceiling', highest >= 2,
+    'topmost clog row=' + highest);
+
+  el('btn-pause').fire('click');
+  el('btn-new-game').fire('click');
+}
+
+/* ------------------------------------- a level is not over until all arrive */
+{
+  // Wipe the visible clogs while the queue still holds plenty. The level must
+  // stay open: "no clogs on the board" is not the same as "level cleared".
+  startAt(12);
+  const queued = C.clogTotal(12) - C.clogSeedCount(12);
+  check('this level really does hold clogs back', queued > 0, 'queued=' + queued);
+  for (let i = 0; i < liveBoard.length; i++) {
+    if (liveBoard[i] && liveBoard[i].type === 'clog') liveBoard[i] = null;
+  }
+  check('the board now has no clogs on it', C.countClogs(liveBoard) === 0,
+    'left=' + C.countClogs(liveBoard));
+
+  let f = 0;
+  while (f < 6000 && !visible('ov-clear') && !visible('ov-gameover')) {
+    global.document.fire('keydown', { key: ' ' });
+    tick(16);
+    f++;
+  }
+  check('an empty board does not clear the level while clogs are queued',
+    !visible('ov-clear'),
+    'cleared after ' + f + ' frames with ' + queued + ' still to arrive');
+
+  if (visible('ov-gameover')) el('btn-menu').fire('click');
+  else { el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
+}
+
 /* ---------------------------------------------------------------- pressure */
 {
   check('the game asks for the pressure step while playing', pressureCalls.length > 0,
@@ -573,15 +660,27 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   check('pressure is asked about elapsed time, not undefined',
     pressureCalls.every(([, ms]) => typeof ms === 'number' && isFinite(ms) && ms >= 0),
     JSON.stringify(pressureCalls[0]));
-  // A competent player clears a level in seconds, so stall one on purpose:
-  // sit on level 0 without touching it for well past the grace period.
+  // Stalling has to be acted out. A competent player clears a level in seconds,
+  // and a player who does nothing at all tops out in under a minute — every
+  // piece lands in the same column. So play slowly instead: let each coupling
+  // fall on its own, steering it to a fresh column so the pipe stays low.
   startAt(0);
   pressureCalls = [];
-  const holdMs = C.pressureGrace(0) + C.PRESSURE_STEP_MS * 2;
-  for (let t = 0; t < holdMs && !visible('ov-gameover') && !visible('ov-clear'); t += 16) {
+  const want = C.pressureGrace(0) + C.PRESSURE_STEP_MS;
+  let longest = 0, spread = 0;
+  pendingSpawn = false;
+  for (let f = 0; f < 30000 && longest <= want; f++) {
+    if (pendingSpawn) {
+      pendingSpawn = false;
+      spread = (spread + 3) % (C.W - 1);
+      let cur = (C.W >> 1) - 1;
+      while (cur < spread) { global.document.fire('keydown', { key: 'ArrowRight' }); cur++; }
+      while (cur > spread) { global.document.fire('keydown', { key: 'ArrowLeft' }); cur--; }
+    }
     tick(16);
+    if (visible('ov-gameover') || visible('ov-clear')) break;
+    longest = pressureCalls.reduce((m, [, ms]) => Math.max(m, ms), 0);
   }
-  const longest = pressureCalls.reduce((m, [, ms]) => Math.max(m, ms), 0);
   check('a stalled level runs past the grace period',
     longest > C.pressureGrace(0),
     'longest=' + Math.round(longest / 1000) + 's grace=' + Math.round(C.pressureGrace(0) / 1000) + 's');

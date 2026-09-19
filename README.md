@@ -28,6 +28,11 @@ Three details make or break a plan:
   survivor is cut loose and drops — which is how you set up chains. Loose halves
   lose their bolted flange and shrink to a plain plug, so you can see at a glance
   which pieces are free.
+- **Clogs keep coming.** A level's quota is not all sitting there at the start.
+  Later levels open with a readable dozen and wash the rest down the pipe as you
+  play — one every few couplings, aimed at the deepest column so it settles low.
+  The counter in the header is what is *left*, arrived or not, so a level is not
+  over until the queue is empty too.
 - **Pressure builds, eventually.** Nothing changes for the first minute — longer
   on a big level, which honestly takes longer to clear. After that the couplings
   speed up a few percent every 30 seconds, topping out around 1.7× after five
@@ -35,6 +40,9 @@ Three details make or break a plan:
 
 Chains multiply your score: each cascade step in a single landing doubles the
 multiplier, up to 16×.
+
+Each level's colours are dealt out evenly, so no single colour can run away with
+a board and strand the other two.
 
 ## Scores
 
@@ -125,7 +133,7 @@ them before you push.
 
 | File | What's in it |
 | --- | --- |
-| `core.js` | Board rules — matching, gravity, cascades, seeding, speed |
+| `core.js` | Board rules — matching, gravity, cascades, seeding, arrivals, speed |
 | `scores.js` | Score history — the rolling window and the all-time table |
 | `game.js` | Canvas rendering, gestures, game loop, scoring, effects |
 | `style.css` | Layout and theming, mobile-first |

@@ -284,8 +284,78 @@
     return best;
   }
 
-  function clogCount(level) {
-    return Math.min(4 + level * 4, 64);
+  // The whole quota for a level, seeded and dripped together. This used to add
+  // four per level up to 64, which outran the player badly.
+  function clogTotal(level) {
+    return Math.min(4 + level * 2, 40);
+  }
+
+  // Only a handful are wedged in at the start. The rest wash down the pipe
+  // while the level is played, so a hard level opens on a readable board.
+  function clogSeedCount(level) {
+    return Math.min(clogTotal(level), 12);
+  }
+
+  // Couplings landed between one arrival and the next.
+  function dripEvery(level) {
+    return Math.max(2, 4 - Math.floor(level / 8));
+  }
+
+  function shuffle(list, rand) {
+    for (var i = list.length - 1; i > 0; i--) {
+      var j = (rand() * (i + 1)) | 0;
+      var t = list[i]; list[i] = list[j]; list[j] = t;
+    }
+    return list;
+  }
+
+  // A level's colours, spread as evenly as the count allows, so no single
+  // colour can dominate and strand the others.
+  function balancedColors(n, rand) {
+    rand = rand || Math.random;
+    var offset = (rand() * COLORS) | 0;
+    var out = [];
+    for (var i = 0; i < n; i++) out.push((i + offset) % COLORS);
+    return shuffle(out, rand);
+  }
+
+  /* ------------------------------------------------------------- arrivals */
+
+  // Where a clog dropped down this column comes to rest: the last free row
+  // before something blocks it. -1 when the column is full to the top.
+  function dripLanding(board, col) {
+    if (col < 0 || col >= W || board[idx(col, 0)]) return -1;
+    var r = 0;
+    while (r + 1 < H && !board[idx(col, r + 1)]) r++;
+    return r;
+  }
+
+  // Arrivals aim for the deepest part of the pipe, so they settle low instead of
+  // perching on the shoulders of a tall pile where nothing can be built under
+  // them. Ties within a couple of rows keep the column from being predictable.
+  var DRIP_DEPTH_SLACK = 2;
+
+  function dripColumn(board, rand) {
+    rand = rand || Math.random;
+    var landings = [], deepest = -1;
+    for (var c = 0; c < W; c++) {
+      var r = dripLanding(board, c);
+      landings.push(r);
+      if (r > deepest) deepest = r;
+    }
+    if (deepest < 0) return -1;
+
+    var near = [];
+    for (var k = 0; k < W; k++) {
+      if (landings[k] >= deepest - DRIP_DEPTH_SLACK) near.push(k);
+    }
+    return near[(rand() * near.length) | 0];
+  }
+
+  function placeClog(board, col, row, color) {
+    if (row < 0 || row >= H || col < 0 || col >= W) return false;
+    board[idx(col, row)] = { color: color, type: 'clog', link: null };
+    return true;
   }
 
   // Clogs sit in the bottom of the pipe and only creep upward as levels get
@@ -295,12 +365,19 @@
     return Math.max(5, Math.min(H - 2, 11 - Math.floor(level / 2)));
   }
 
-  // Places grime so that no colour already sits 3-in-a-line — otherwise a level
-  // can cascade on its own the instant it opens.
+  // Builds a level: the clogs wedged in at the start, plus the queue of those
+  // still to wash down. Nothing is placed 3-in-a-line, or the level would
+  // cascade on its own the instant it opens.
   function seedLevel(level, rand) {
     rand = rand || Math.random;
     var board = makeBoard();
-    var target = clogCount(level);
+    var quota = balancedColors(clogTotal(level), rand);
+    var seedN = Math.min(quota.length, clogSeedCount(level));
+
+    var want = [];
+    for (var z = 0; z < COLORS; z++) want.push(0);
+    for (var q = 0; q < seedN; q++) want[quota[q]]++;
+
     var top = seedTopRow(level);
     var slots = [];
     for (var r = top; r < H; r++) {
@@ -309,22 +386,30 @@
 
     var placed = 0;
     var guard = slots.length * 200;
-    while (placed < target && guard-- > 0) {
+    while (placed < seedN && guard-- > 0) {
       var i = slots[(rand() * slots.length) | 0];
       if (board[i]) continue;
       var cc = colOf(i), rr = rowOf(i);
-      var order = [0, 1, 2];
-      for (var s = order.length - 1; s > 0; s--) {
-        var j = (rand() * (s + 1)) | 0;
-        var t = order[s]; order[s] = order[j]; order[j] = t;
-      }
-      for (var k = 0; k < order.length; k++) {
-        board[i] = { color: order[k], type: 'clog', link: null };
-        if (runThrough(board, cc, rr) < 3) { placed++; break; }
+
+      var order = [];
+      for (var k = 0; k < COLORS; k++) if (want[k] > 0) order.push(k);
+      if (!order.length) break;
+      shuffle(order, rand);
+
+      for (var m = 0; m < order.length; m++) {
+        board[i] = { color: order[m], type: 'clog', link: null };
+        if (runThrough(board, cc, rr) < 3) { want[order[m]]--; placed++; break; }
         board[i] = null;
       }
     }
-    return board;
+
+    // Anything that could not be placed joins the queue, so the level's total
+    // and its colour balance hold either way.
+    var pending = quota.slice(seedN);
+    for (var k2 = 0; k2 < COLORS; k2++) {
+      for (var n = 0; n < want[k2]; n++) pending.push(k2);
+    }
+    return { board: board, pending: shuffle(pending, rand) };
   }
 
   function countClogs(board) {
@@ -361,7 +446,10 @@
     pieceCells: pieceCells, canPlace: canPlace, fits: fits,
     tryMove: tryMove, tryRotate: tryRotate, dropDistance: dropDistance,
     lockPiece: lockPiece, spawnPiece: spawnPiece, randomColors: randomColors,
-    seedLevel: seedLevel, clogCount: clogCount, countClogs: countClogs,
+    seedLevel: seedLevel, clogTotal: clogTotal, countClogs: countClogs,
+    clogSeedCount: clogSeedCount, dripEvery: dripEvery, balancedColors: balancedColors,
+    dripLanding: dripLanding, dripColumn: dripColumn, placeClog: placeClog,
+    shuffle: shuffle,
     runThrough: runThrough, fallInterval: fallInterval,
     seedTopRow: seedTopRow, pressureStep: pressureStep, pressureGrace: pressureGrace,
     PRESSURE_GRACE_MS: PRESSURE_GRACE_MS,

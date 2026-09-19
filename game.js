@@ -9,6 +9,7 @@
   var MAX_LOCK_RESETS = 8;
   var CLEAR_MS = 260;     // dissolve animation
   var SETTLE_MS = 52;     // per row of post-clear gravity
+  var DRIP_MS = 34;       // per row of a clog washing down the pipe
   var TAP_MS = 280;       // a press shorter than this, that barely moved, is a tap
   var TAP_SLOP = 11;      // px of movement still considered a tap
   var FLICK_VY = 1.0;     // px/ms downward to count as a slam
@@ -109,6 +110,7 @@
       this.tone(base * 2, 0.16, 'triangle', 0.05, 0.12);
     },
     pressure: function () { this.sweep(240, 520, 0.34, 'sawtooth', 0.05); },
+    drip: function () { this.sweep(680, 180, 0.22, 'sine', 0.07); },
     // A rising rush of water.
     flush: function () {
       this.sweep(320, 1500, 0.9, 'sine', 0.07);
@@ -144,6 +146,9 @@
     clearSet: null,
     clearTimer: 0,
     settleTimer: 0,
+    pending: [],          // clogs still to wash down this level
+    sinceDrip: 0,         // couplings landed since the last arrival
+    drip: null,           // {col, color, row, target} while one is falling
     levelElapsed: 0,      // drives the pressure ramp
     pressure: 0,
     shake: 0,
@@ -705,6 +710,38 @@
     });
   }
 
+  // A clog washing down the pipe, with a marker on the cell it is heading for
+  // so the landing is never a surprise.
+  function drawDrip(t) {
+    if (!S.drip) return;
+    var ctx = bctx, sz = view.cell;
+    var d = S.drip;
+
+    var pos = cellXY(d.col, d.target);
+    ctx.save();
+    ctx.globalAlpha = 0.35 + Math.sin(t * 0.012) * 0.12;
+    roundRect(ctx, pos.x + sz * 0.14, pos.y + sz * 0.14, sz * 0.72, sz * 0.72,
+      [sz * 0.24, sz * 0.24, sz * 0.24, sz * 0.24]);
+    ctx.strokeStyle = PALETTE[d.color].main;
+    ctx.lineWidth = Math.max(1.5, sz * 0.07);
+    ctx.setLineDash([sz * 0.14, sz * 0.12]);
+    ctx.stroke();
+    ctx.restore();
+
+    var y = view.y0 + d.row * sz;
+    // a wet streak trailing behind it
+    ctx.save();
+    var g = ctx.createLinearGradient(0, y - sz * 1.6, 0, y + sz);
+    g.addColorStop(0, 'rgba(' + PALETTE[d.color].rgb + ',0)');
+    g.addColorStop(1, 'rgba(' + PALETTE[d.color].rgb + ',0.22)');
+    ctx.fillStyle = g;
+    ctx.fillRect(view.x0 + d.col * sz + sz * 0.3, Math.max(view.y0, y - sz * 1.6),
+      sz * 0.4, Math.min(sz * 1.6, y - view.y0 + sz * 0.5));
+    ctx.restore();
+
+    blit(ctx, clogSprite(d.color, d.col + d.target), view.x0 + d.col * sz, y, sz);
+  }
+
   function drawToast() {
     if (!S.toast) return;
     var ctx = bctx;
@@ -915,6 +952,7 @@
     bctx.clip();
     drawBoard();
     drawPiece();
+    drawDrip(t);
     drawHint();
     drawToast();
     bctx.restore();
@@ -928,7 +966,7 @@
   var hudShown = { score: -1, best: -1, level: -1, clogs: -1 };
 
   function refreshHUD() {
-    var clogs = C.countClogs(S.board);
+    var clogs = C.countClogs(S.board) + S.pending.length;
     if (S.score !== hudShown.score) { $('hud-score').textContent = hudShown.score = S.score; }
     if (S.best !== hudShown.best) { $('hud-best').textContent = hudShown.best = S.best; }
     if (S.level !== hudShown.level) { $('hud-level').textContent = hudShown.level = S.level; }
@@ -969,7 +1007,11 @@
     // keeps the same run going, so it must not file one.
     if (!keepScore) { endRun(); S.recorded = false; }
     S.level = Math.max(0, Math.min(C.MAX_LEVEL, level));
-    S.board = C.seedLevel(S.level);
+    var built = C.seedLevel(S.level);
+    S.board = built.board;
+    S.pending = built.pending;
+    S.sinceDrip = 0;
+    S.drip = null;
     if (!keepScore) S.score = 0;
     S.chain = 0;
     S.clearSet = null;
@@ -1048,10 +1090,24 @@
     refreshHUD();
   }
 
+  function clogsLeft() { return C.countClogs(S.board) + S.pending.length; }
+
+  // Sends the next queued clog washing down a column of its own choosing.
+  function startDrip() {
+    var col = C.dripColumn(S.board, Math.random);
+    var target = col < 0 ? -1 : C.dripLanding(S.board, col);
+    S.sinceDrip = 0;
+    if (target < 0) return false;   // nowhere for it to go; try again later
+    S.drip = { col: col, color: S.pending.shift(), row: -1, target: target };
+    S.phase = 'dripping';
+    return true;
+  }
+
   function afterSettle() {
     var hits = C.findMatches(S.board);
     if (hits.size) { beginClear(hits); return; }
-    if (C.countClogs(S.board) === 0) { levelCleared(); return; }
+    if (S.pending.length && S.sinceDrip >= C.dripEvery(S.level) && startDrip()) return;
+    if (clogsLeft() === 0) { levelCleared(); return; }
     spawn();
   }
 
@@ -1062,6 +1118,7 @@
     S.shake = 2.5;
     gesture = null;
     S.locks++;
+    S.sinceDrip++;
     if (S.locks >= 3) S.hint = Math.min(S.hint, 0.6);
     Sound.lock();
     S.chain = 0;
@@ -1124,6 +1181,16 @@
         S.phase = 'settling';
         S.settleTimer = 0;
         refreshHUD();
+      }
+    } else if (S.phase === 'dripping') {
+      S.drip.row += dt / DRIP_MS;
+      if (S.drip.row >= S.drip.target) {
+        C.placeClog(S.board, S.drip.col, S.drip.target, S.drip.color);
+        S.drip = null;
+        S.shake = 2;
+        Sound.drip();
+        refreshHUD();
+        afterSettle();
       }
     } else if (S.phase === 'settling') {
       S.settleTimer += dt;
@@ -1555,7 +1622,7 @@
 
   function updateLevelPicker() {
     $('lv-num').textContent = 'Level ' + S.startLevel;
-    $('lv-clogs').textContent = C.clogCount(S.startLevel) + ' clogs';
+    $('lv-clogs').textContent = C.clogTotal(S.startLevel) + ' clogs';
     $('menu-best').textContent = 'Best: ' + S.best;
   }
 
@@ -1644,7 +1711,7 @@
   self.addEventListener('orientationchange', function () { setTimeout(layout, 120); });
 
   syncSoundButton();
-  S.board = C.seedLevel(S.startLevel);
+  S.board = C.seedLevel(S.startLevel).board;
   updateLevelPicker();
   refreshHUD();
   layout();

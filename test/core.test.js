@@ -190,8 +190,11 @@ function lcg(seed) {
 /* -------------------------------------------------------------- seeding */
 {
   for (let level = 0; level <= C.MAX_LEVEL; level++) {
-    const b = C.seedLevel(level, lcg(level + 1));
-    eq('level ' + level + ' places the requested grime', C.countClogs(b), C.clogCount(level));
+    const { board: b, pending } = C.seedLevel(level, lcg(level + 1));
+    eq('level ' + level + ' seeds and queues its whole quota',
+      C.countClogs(b) + pending.length, C.clogTotal(level));
+    eq('level ' + level + ' starts with only a readable handful',
+      C.countClogs(b), Math.min(C.clogTotal(level), C.clogSeedCount(level)));
     eq('level ' + level + ' opens with no free match', C.findMatches(b).size, 0);
     const top = C.seedTopRow(level);
     const topRowsClear = b.slice(0, top * C.W).every(x => x === null);
@@ -199,11 +202,126 @@ function lcg(seed) {
     const noTriples = b.every((cell, i) =>
       !cell || C.runThrough(b, C.colOf(i), C.rowOf(i)) < 3);
     check('level ' + level + ' has no 3-in-a-line at seed', noTriples);
+
+    // No colour may run away with a level.
+    const tally = [0, 0, 0];
+    b.forEach((cell) => { if (cell) tally[cell.color]++; });
+    pending.forEach((c) => { tally[c]++; });
+    const spread = Math.max(...tally) - Math.min(...tally);
+    check('level ' + level + ' spreads its colours evenly', spread <= 1,
+      'tally=' + tally.join(','));
   }
 }
 {
-  eq('level 0 grime count', C.clogCount(0), 4);
-  check('grime count is capped', C.clogCount(C.MAX_LEVEL) <= 64);
+  eq('level 0 clog count', C.clogTotal(0), 4);
+  check('the clog count is capped', C.clogTotal(C.MAX_LEVEL) <= 40);
+
+  // Difficulty must climb, but gently.
+  check('each level adds only a couple of clogs',
+    C.clogTotal(5) - C.clogTotal(4) <= 2,
+    C.clogTotal(4) + ' -> ' + C.clogTotal(5));
+  check('a mid level is far lighter than it used to be', C.clogTotal(10) < 44,
+    'total=' + C.clogTotal(10));
+  check('clog totals never decrease with level',
+    Array.from({ length: C.MAX_LEVEL }, (_, i) => C.clogTotal(i + 1) >= C.clogTotal(i))
+      .every(Boolean));
+
+  // Later levels hold more of their quota back rather than showing it all.
+  check('a hard level opens with fewer clogs than it holds',
+    C.clogSeedCount(C.MAX_LEVEL) < C.clogTotal(C.MAX_LEVEL),
+    C.clogSeedCount(C.MAX_LEVEL) + ' of ' + C.clogTotal(C.MAX_LEVEL));
+  check('an easy level has nothing held back',
+    C.clogSeedCount(0) === C.clogTotal(0));
+  check('arrivals come faster on harder levels',
+    C.dripEvery(C.MAX_LEVEL) < C.dripEvery(0),
+    C.dripEvery(0) + ' -> ' + C.dripEvery(C.MAX_LEVEL));
+  check('arrivals are never every single piece', C.dripEvery(C.MAX_LEVEL) >= 2);
+}
+
+/* ------------------------------------------------------- colour balance */
+{
+  const rand = lcg(11);
+  for (const n of [0, 1, 2, 3, 7, 12, 40]) {
+    const list = C.balancedColors(n, rand);
+    eq('balanced colours returns ' + n + ' entries', list.length, n);
+    const tally = [0, 0, 0];
+    list.forEach((c) => tally[c]++);
+    check('a run of ' + n + ' is evenly spread',
+      n === 0 || Math.max(...tally) - Math.min(...tally) <= 1, tally.join(','));
+    check('every entry is a real colour',
+      list.every((c) => c >= 0 && c < C.COLORS), list.join(','));
+  }
+  // Which colour gets a remainder should not always be the same one. (Seeds are
+  // spread widely on purpose: consecutive lcg seeds share almost the same first
+  // value, which would make this look broken when it is not.)
+  const spares = new Set();
+  const spread = lcg(20260918);
+  for (let i = 0; i < 40; i++) {
+    const t = [0, 0, 0];
+    C.balancedColors(4, spread).forEach((c) => t[c]++);
+    spares.add(t.indexOf(2));
+  }
+  check('the spare colour varies between levels', spares.size > 1,
+    [...spares].join(','));
+}
+
+/* ------------------------------------------------------------- arrivals */
+{
+  const b = C.makeBoard();
+  eq('a clog falls to the floor of an empty column', C.dripLanding(b, 3), C.H - 1);
+
+  put(b, 3, C.H - 1, clog(0));
+  eq('it rests on whatever is already there', C.dripLanding(b, 3), C.H - 2);
+
+  for (let r = 0; r < C.H; r++) put(b, 5, r, seg(1));
+  eq('a full column takes no more', C.dripLanding(b, 5), -1);
+  eq('an out-of-range column is refused', C.dripLanding(b, 99), -1);
+
+  // It should settle low, not perch on top of the tallest pile.
+  const board2 = C.makeBoard();
+  for (let r = 1; r < C.H; r++) put(board2, 0, r, seg(0));
+  const col = C.dripColumn(board2, lcg(5));
+  check('arrivals avoid the tallest column', col !== 0, 'col=' + col);
+  check('the chosen column has room', C.dripLanding(board2, col) >= 3,
+    'landing=' + C.dripLanding(board2, col));
+
+  // One clear column among shallow ones must win: a clog that lands high is
+  // one nothing can ever be stacked under.
+  const board5 = C.makeBoard();
+  for (let c = 0; c < C.W; c++) {
+    if (c === 4) continue;
+    for (let r = 6; r < C.H; r++) put(board5, c, r, seg(1));
+  }
+  const runs = new Set();
+  for (let seed = 1; seed < 40; seed++) runs.add(C.dripColumn(board5, lcg(seed * 7919)));
+  check('arrivals head for the one deep column', runs.size === 1 && runs.has(4),
+    'columns chosen=' + [...runs].join(','));
+
+  // Among equally deep columns it should not always pick the same one.
+  const board6 = C.makeBoard();
+  for (let c = 0; c < C.W; c++) put(board6, c, C.H - 1, seg(0));
+  const varied = new Set();
+  for (let seed = 1; seed < 60; seed++) varied.add(C.dripColumn(board6, lcg(seed * 7919)));
+  check('level ground still varies the column', varied.size > 2,
+    'columns chosen=' + [...varied].join(','));
+
+  // With everything nearly full it still finds the deepest option.
+  const board3 = C.makeBoard();
+  for (let c = 0; c < C.W; c++) {
+    for (let r = (c === 6 ? 4 : 1); r < C.H; r++) put(board3, c, r, seg(2));
+  }
+  eq('when the pipe is packed it picks the deepest column',
+    C.dripColumn(board3, lcg(3)), 6);
+
+  const board4 = C.makeBoard();
+  check('placing an arrival works', C.placeClog(board4, 2, 9, 1));
+  eq('the arrival becomes a clog', board4[C.idx(2, 9)].type, 'clog');
+  eq('the arrival keeps its colour', board4[C.idx(2, 9)].color, 1);
+  eq('an arrival never falls afterwards',
+    (C.settle(board4), C.rowOf(board4.indexOf(board4[C.idx(2, 9)]))), 9);
+  check('placing off the board is refused', !C.placeClog(board4, 2, -1, 0));
+}
+{
   check('speed increases with level', C.fallInterval(5) < C.fallInterval(0));
   check('speed has a floor', C.fallInterval(99) >= 70);
 }
@@ -221,8 +339,9 @@ function lcg(seed) {
   // no-3-in-a-line rule starving the placement loop.
   for (let level = 0; level <= C.MAX_LEVEL; level++) {
     const capacity = (C.H - C.seedTopRow(level)) * C.W;
-    check('level ' + level + ' has room for its grime', C.clogCount(level) <= capacity * 0.8,
-      C.clogCount(level) + ' of ' + capacity);
+    check('level ' + level + ' has room for the clogs it seeds',
+      C.clogSeedCount(level) <= capacity * 0.8,
+      C.clogSeedCount(level) + ' of ' + capacity);
   }
 
   // Pressure is for stalling, so ordinary play must never feel it.
