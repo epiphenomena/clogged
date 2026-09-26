@@ -29,13 +29,19 @@ Three details make or break a plan:
   lose their bolted flange and shrink to a plain plug, so you can see at a glance
   which pieces are free.
 - **Clogs keep coming.** A level's quota is not all sitting there at the start.
-  Later levels open with a readable dozen and wash the rest down the pipe as you
-  play — one every few couplings, aimed at the deepest column so it settles low.
+  The harder the level, the smaller the share wedged in when it opens — the rest
+  wash down the pipe as you play — one every few couplings, aimed at the deepest column so it settles low.
   Sometimes one catches on something it brushes past on the way down and wedges
   there instead, leaving an overhang to build under; it will only ever snag low
   enough in the pipe that a line can still be run through it. The counter in the
   header is what is *left*, arrived or not, so a level is not over until the
   queue is empty too.
+- **The pipe grows.** Levels 0–4 are played in an 8×16 pipe, levels 5–9 in a
+  10×20 one, and level 10 onward in a 12×24 one. It always fills the screen: the
+  fittings get smaller rather than the pipe getting longer, and couplings fall
+  proportionally faster so one still crosses the screen in about the same time.
+  The level picker on the title screen names the pipe you are about to play in,
+  and shows it behind the menu.
 - **Pressure builds, eventually.** Nothing changes for the first minute — longer
   on a big level, which honestly takes longer to clear. After that the couplings
   speed up a few percent every 30 seconds, topping out around 1.7× after five
@@ -77,6 +83,36 @@ The pipe itself is the controller — there is no button row to cover the board.
 Dragging maps your finger to an absolute column, so the piece tracks your thumb
 instead of drifting, and dragging downward walks the piece down with you. A
 dashed outline previews where it will land.
+
+One gesture, two directions: the game decides which one you mean from where your
+finger is travelling *now*, not from where the drag began. While you are heading
+down, the sideways part is ignored — a thumb arcs on its way down a phone screen,
+and that arc used to nudge the coupling out of the column you had just aimed at.
+Aim, ease down, and aim again all work inside a single drag. A slam likewise has
+to be going mostly downward, so a quick swipe across with a droop in it does not
+fire one.
+
+### Spinning in a tight spot
+
+A quarter turn leaves the anchor half where it is and swings its partner around.
+When the partner's cell is taken, the pair may shift by one cell — a kick — and
+the offsets are tried in a fixed order, so the same situation always resolves the
+same way:
+
+1. in place;
+2. one cell away from whatever is in the way — sideways when the coupling is
+   lying down against a wall or a stack, upward when it is standing up off the
+   floor;
+3. one cell sideways, for a standing turn pinched between neighbours.
+
+A kick never moves the pair **downward**: gaining a row on a turn would let a
+coupling slip past a slot you could still have slid into. The one exception is
+the mouth of the pipe, where there is no row above to borrow, so a coupling on
+the top row drops a row in order to stand up.
+
+Anything still blocked after that is refused and the coupling keeps its current
+orientation. In a one-wide well — no room either side at its own row or the row
+above — it simply stays lying down.
 
 Each colour also carries a shape — ring, bar, cross — so the game is playable
 without relying on colour vision.

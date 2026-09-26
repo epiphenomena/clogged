@@ -3,7 +3,11 @@
   'use strict';
 
   var C = self.Core;
-  var W = C.W, H = C.H;
+
+  // The pipe widens on later levels, so nothing here may cache its size: these
+  // always read the board actually in play.
+  function cols() { return S.board.w; }
+  function rows() { return S.board.h; }
 
   var LOCK_DELAY = 320;   // grace period to slide a landed coupling
   var MAX_LOCK_RESETS = 8;
@@ -167,10 +171,13 @@
 
   var Sc = self.Scores;
   var Sv = self.Save;
-  var SAVE_LIMITS = { cells: W * H, cols: W, colors: C.COLORS, maxLevel: C.MAX_LEVEL };
+  var SAVE_LIMITS = { maxW: C.MAX_W, maxH: C.MAX_H, colors: C.COLORS, maxLevel: C.MAX_LEVEL };
   var history = Sc.seedBest(Sc.sanitize(Store.get('history', null)), S.best);
 
-  var view = { cell: 24, wall: 7, collar: 13, grate: 11, x0: 0, y0: 0, vw: 0, vh: 0, dpr: 1, bg: null };
+  var view = {
+    cell: 24, wall: 7, collar: 13, grate: 11, x0: 0, y0: 0,
+    cols: C.BASE_W, rows: C.BASE_H, vw: 0, vh: 0, dpr: 1, bg: null
+  };
 
   /* -------------------------------------------------------------- layout */
 
@@ -187,17 +194,23 @@
     // The pipe runs nearly edge to edge; the side walls take a fixed sliver
     // rather than a share of the cell, so the playfield gets the rest.
     var wall = Math.max(4, Math.round(vw * 0.018));
-    var cell = Math.floor(Math.min((vw - wall * 2) / W, availH / H));
+    var cs = cols(), rs = rows();
+    var cell = Math.floor(Math.min((vw - wall * 2) / cs, availH / rs));
     cell = Math.max(10, Math.min(cell, 96));
 
     var collar = Math.max(7, Math.round(cell * 0.5));
     var grate = Math.max(6, Math.round(cell * 0.42));
-    var boardW = W * cell, boardH = H * cell;
+    var boardW = cs * cell, boardH = rs * cell;
 
     var dpr = Math.min(self.devicePixelRatio || 1, 2.5);
-    var same = view.cell === cell && view.vw === vw && view.vh === vh && view.dpr === dpr;
+    // A new level can change the pipe's size without changing the cell size, so
+    // the shape of the board is part of what makes a rebuild necessary.
+    var same = view.cell === cell && view.vw === vw && view.vh === vh
+      && view.dpr === dpr && view.cols === cs && view.rows === rs;
 
     view.cell = cell;
+    view.cols = cs;
+    view.rows = rs;
     view.wall = wall;
     view.collar = collar;
     view.grate = grate;
@@ -266,7 +279,7 @@
   // reads as continuing past the viewport instead of floating in a margin.
   function paintPipe(ctx, vw, vh, cell) {
     var v = view;
-    var boardW = W * cell, boardH = H * cell;
+    var boardW = v.cols * cell, boardH = v.rows * cell;
     var outerX = v.x0 - v.wall, outerW = boardW + v.wall * 2;
     var top = v.y0, bottom = v.y0 + boardH;
 
@@ -291,13 +304,13 @@
     ctx.clip();
     ctx.strokeStyle = 'rgba(255,255,255,0.032)';
     ctx.lineWidth = 1;
-    for (var c = 1; c < W; c++) {
+    for (var c = 1; c < v.cols; c++) {
       ctx.beginPath();
       ctx.moveTo(v.x0 + c * cell + 0.5, top);
       ctx.lineTo(v.x0 + c * cell + 0.5, bottom);
       ctx.stroke();
     }
-    for (var r = 1; r < H; r++) {
+    for (var r = 1; r < v.rows; r++) {
       ctx.beginPath();
       ctx.moveTo(v.x0, top + r * cell + 0.5);
       ctx.lineTo(v.x0 + boardW, top + r * cell + 0.5);
@@ -632,13 +645,13 @@
   // warning frame changes from frame to frame.
   function drawPipe(t) {
     var choked = false;
-    for (var i = 0; i < W * 2; i++) if (S.board[i]) { choked = true; break; }
+    for (var i = 0; i < cols() * 2; i++) if (S.board[i]) { choked = true; break; }
     if (!choked || S.phase === 'gameover') return;
     var ctx = bctx, v = view;
     var pulse = 0.3 + Math.sin(t * 0.006) * 0.2;
     ctx.strokeStyle = 'rgba(251,113,133,' + pulse.toFixed(3) + ')';
     ctx.lineWidth = Math.max(2, v.cell * 0.1);
-    ctx.strokeRect(v.x0 + 1, v.y0 + 1, W * v.cell - 2, v.cell * 2 - 2);
+    ctx.strokeRect(v.x0 + 1, v.y0 + 1, v.cols * v.cell - 2, v.cell * 2 - 2);
   }
 
   function drawBoard() {
@@ -649,8 +662,8 @@
     for (var i = 0; i < S.board.length; i++) {
       var cell = S.board[i];
       if (!cell) continue;
-      var x = view.x0 + C.colOf(i) * s;
-      var y = view.y0 + C.rowOf(i) * s;
+      var x = view.x0 + (i % view.cols) * s;
+      var y = view.y0 + ((i / view.cols) | 0) * s;
       var sprite = cell.type === 'clog'
         ? clogSprite(cell.color, i)
         : segSprite(cell.color, cell.link);
@@ -688,7 +701,7 @@
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,0.055)';
     cells.forEach(function (cl) {
-      ctx.fillRect(view.x0 + cl.c * s, view.y0, s, H * s);
+      ctx.fillRect(view.x0 + cl.c * s, view.y0, s, view.rows * s);
     });
     ctx.restore();
 
@@ -761,7 +774,7 @@
     ctx.shadowColor = 'rgba(0,0,0,0.85)';
     ctx.shadowBlur = 10;
     ctx.fillText(S.toast.text, view.vw / 2,
-      view.y0 + H * view.cell * 0.34 - p * view.cell * 1.6);
+      view.y0 + view.rows * view.cell * 0.34 - p * view.cell * 1.6);
     ctx.restore();
   }
 
@@ -776,7 +789,7 @@
     ctx.fillStyle = '#9fb0d6';
     ctx.shadowColor = 'rgba(0,0,0,0.9)';
     ctx.shadowBlur = 6;
-    var y = view.y0 + H * view.cell - view.cell * 0.9;
+    var y = view.y0 + view.rows * view.cell - view.cell * 0.9;
     ctx.fillText('Drag to aim · tap to spin · flick down to slam', view.vw / 2, y);
     ctx.restore();
   }
@@ -953,7 +966,7 @@
     drawPipe(t);
     bctx.save();
     bctx.beginPath();
-    bctx.rect(view.x0, view.y0, W * view.cell, H * view.cell);
+    bctx.rect(view.x0, view.y0, view.cols * view.cell, view.rows * view.cell);
     bctx.clip();
     drawBoard();
     drawPiece();
@@ -1043,6 +1056,7 @@
     var built = C.seedLevel(S.level);
     S.board = built.board;
     S.pending = built.pending;
+    layout();      // the pipe may be a different size at this level
     S.sinceDrip = 0;
     S.drip = null;
     if (!keepScore) S.score = 0;
@@ -1062,7 +1076,7 @@
   }
 
   function spawn() {
-    S.piece = C.spawnPiece(S.nextColors);
+    S.piece = C.spawnPiece(S.board, S.nextColors);
     S.nextColors = C.randomColors();
     drawNext();
     S.fallTimer = 0;
@@ -1199,7 +1213,7 @@
       if (S.hint > 0) S.hint = Math.max(0, S.hint - dt / 9000);
 
       S.fallTimer += dt;
-      if (S.fallTimer >= C.fallInterval(S.level, S.levelElapsed)) {
+      if (S.fallTimer >= C.fallInterval(S.level, S.levelElapsed, rows())) {
         S.fallTimer = 0;
         stepFall();
       }
@@ -1217,7 +1231,7 @@
         refreshHUD();
       }
     } else if (S.phase === 'dripping') {
-      S.drip.row += dt / DRIP_MS;
+      S.drip.row += dt / (DRIP_MS * C.BASE_H / rows());
       if (S.drip.row >= S.drip.target) {
         C.placeClog(S.board, S.drip.col, S.drip.target, S.drip.color);
         S.drip = null;
@@ -1266,7 +1280,7 @@
 
   function moveToward(col) {
     if (!playing() || S.piece.c === col) return;
-    var guard = W;
+    var guard = cols();
     while (S.piece.c !== col && guard-- > 0) {
       var next = C.tryMove(S.board, S.piece, col > S.piece.c ? 1 : -1, 0);
       if (!next) break;
@@ -1279,7 +1293,7 @@
   // Follows the finger downward. Never lifts a piece back up.
   function dropToRow(row) {
     if (!playing() || S.piece.r >= row) return;
-    var guard = H;
+    var guard = rows();
     while (S.piece.r < row && guard-- > 0) {
       var next = C.tryMove(S.board, S.piece, 0, 1);
       if (!next) break;
@@ -1410,7 +1424,7 @@
       return;
     }
 
-    steer(Math.max(0, Math.min(W - 1, gesture.col0 + Math.round(dx / view.cell))), row);
+    steer(Math.max(0, Math.min(cols() - 1, gesture.col0 + Math.round(dx / view.cell))), row);
   }, { passive: false });
 
   function endGesture(e) {
@@ -1697,6 +1711,7 @@
     S.level = saved.level;
     S.score = saved.score;
     S.board = saved.board;
+    layout();      // the snapshot carries its own pipe size
     S.piece = saved.piece;
     S.nextColors = saved.next;
     S.pending = saved.pending;
@@ -1732,9 +1747,21 @@
   }
 
   function updateLevelPicker() {
+    var d = C.dimsFor(S.startLevel);
     $('lv-num').textContent = 'Level ' + S.startLevel;
-    $('lv-clogs').textContent = C.clogTotal(S.startLevel) + ' clogs';
+    $('lv-clogs').textContent = C.clogTotal(S.startLevel) + ' clogs · ' + d.w + '×' + d.h;
     $('menu-best').textContent = 'Best: ' + S.best;
+  }
+
+  // The title screen shows the pipe you are about to play in, so a change of
+  // size further up the levels is visible before you commit to it.
+  function previewLevel() {
+    if (S.phase !== 'menu') return;
+    var built = C.seedLevel(S.startLevel);
+    S.board = built.board;
+    S.pending = built.pending;
+    layout();
+    refreshHUD();
   }
 
   function toMenu() {
@@ -1758,11 +1785,13 @@
     S.startLevel = Math.max(0, S.startLevel - 1);
     Store.set('startLevel', S.startLevel);
     updateLevelPicker();
+    previewLevel();
   });
   $('lv-up').addEventListener('click', function () {
     S.startLevel = Math.min(C.MAX_LEVEL, S.startLevel + 1);
     Store.set('startLevel', S.startLevel);
     updateLevelPicker();
+    previewLevel();
   });
 
   $('btn-start').addEventListener('click', function () {

@@ -17,7 +17,7 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
-  var VERSION = 2;
+  var VERSION = 3;
   var LINKS = { left: 1, right: 1, up: 1, down: 1 };
 
   function isInt(n, lo, hi) {
@@ -33,6 +33,10 @@
       v: VERSION,
       level: game.level,
       score: game.score,
+      // The pipe is a different size at different levels, so the snapshot
+      // records the one it was being played on rather than assuming.
+      w: game.board.w,
+      h: game.board.h,
       board: game.board.map(function (cell) {
         return cell ? [cell.color, cell.type === 'clog' ? 1 : 0, cell.link || 0] : 0;
       }),
@@ -54,12 +58,20 @@
   // throws, never half-restores.
   function decode(raw, limits) {
     if (!raw || typeof raw !== 'object' || raw.v !== VERSION) return null;
-    var cells = limits.cells, colors = limits.colors, cols = limits.cols;
-    var rows = cells / cols;
+    var colors = limits.colors;
+
+    // The board's own geometry comes out of the record, so a snapshot taken on
+    // one size of pipe cannot be read back as another.
+    var cols = raw.w, rows = raw.h;
+    if (!isInt(cols, 2, limits.maxW) || !isInt(rows, 2, limits.maxH)) return null;
+    var cells = cols * rows;
 
     if (!Array.isArray(raw.board) || raw.board.length !== cells) return null;
 
+    // Carries its dimensions the way every other board in the game does.
     var board = [];
+    board.w = cols;
+    board.h = rows;
     var clogs = 0;
     for (var i = 0; i < cells; i++) {
       var slot = raw.board[i];

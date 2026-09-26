@@ -13,15 +13,15 @@ function eq(name, actual, expected) {
   check(name, actual === expected, 'got ' + JSON.stringify(actual) + ', expected ' + JSON.stringify(expected));
 }
 
-const LIMITS = { cells: C.W * C.H, cols: C.W, colors: C.COLORS, maxLevel: C.MAX_LEVEL };
+const LIMITS = { maxW: C.MAX_W, maxH: C.MAX_H, colors: C.COLORS, maxLevel: C.MAX_LEVEL };
 
 function sampleGame() {
   const board = C.makeBoard();
-  board[C.idx(2, 14)] = { color: 1, type: 'clog', link: null };
-  board[C.idx(3, 15)] = { color: 0, type: 'segment', link: 'right' };
-  board[C.idx(4, 15)] = { color: 2, type: 'segment', link: 'left' };
-  board[C.idx(5, 12)] = { color: 2, type: 'segment', link: 'down' };
-  board[C.idx(5, 13)] = { color: 1, type: 'segment', link: 'up' };
+  board[C.idx(board, 2, 14)] = { color: 1, type: 'clog', link: null };
+  board[C.idx(board, 3, 15)] = { color: 0, type: 'segment', link: 'right' };
+  board[C.idx(board, 4, 15)] = { color: 2, type: 'segment', link: 'left' };
+  board[C.idx(board, 5, 12)] = { color: 2, type: 'segment', link: 'down' };
+  board[C.idx(board, 5, 13)] = { color: 1, type: 'segment', link: 'up' };
   return {
     level: 7,
     score: 4820,
@@ -54,11 +54,11 @@ function sampleGame() {
     JSON.stringify(after.piece), JSON.stringify(before.piece));
   eq('the board survives cell for cell',
     JSON.stringify(after.board), JSON.stringify(before.board));
-  eq('clogs stay clogs', after.board[C.idx(2, 14)].type, 'clog');
-  eq('segments stay segments', after.board[C.idx(3, 15)].type, 'segment');
-  eq('links survive', after.board[C.idx(3, 15)].link, 'right');
-  eq('a vertical link survives', after.board[C.idx(5, 12)].link, 'down');
-  eq('empty cells stay empty', after.board[C.idx(0, 0)], null);
+  eq('clogs stay clogs', after.board[C.idx(after.board, 2, 14)].type, 'clog');
+  eq('segments stay segments', after.board[C.idx(after.board, 3, 15)].type, 'segment');
+  eq('links survive', after.board[C.idx(after.board, 3, 15)].link, 'right');
+  eq('a vertical link survives', after.board[C.idx(after.board, 5, 12)].link, 'down');
+  eq('empty cells stay empty', after.board[C.idx(after.board, 0, 0)], null);
 }
 
 // A board with no piece (between couplings) is still restorable.
@@ -74,10 +74,47 @@ function sampleGame() {
 {
   const back = S.decode(S.encode(sampleGame()), LIMITS);
   check('the restored board accepts a piece',
-    C.fits(back.board, C.spawnPiece([0, 1])));
+    C.fits(back.board, C.spawnPiece(back.board, [0, 1])));
   check('gravity works on the restored board', C.settle(back.board) >= 0);
   check('match detection works on the restored board',
     C.findMatches(back.board) instanceof Set);
+}
+
+/* The pipe is a different size on later levels, so the snapshot has to carry
+   its own geometry rather than assuming the one the game opens with. */
+{
+  const built = C.seedLevel(12, () => 0.5);
+  const wide = built.board;
+  check('the level-12 pipe really is a different size',
+    wide.w !== C.BASE_W && wide.h !== C.BASE_H, wide.w + 'x' + wide.h);
+
+  const raw = S.encode({
+    level: 12, score: 1200, board: wide, piece: C.spawnPiece(wide, [0, 1]),
+    next: [1, 2], pending: built.pending, sinceDrip: 1, elapsed: 500,
+    pressure: 0, locks: 4, recorded: false
+  });
+  eq('the snapshot records the width it was played on', raw.w, wide.w);
+  const back = S.decode(raw, LIMITS);
+  check('a wide-pipe game decodes', !!back);
+  eq('the restored board keeps its width', back.board.w, wide.w);
+  eq('the restored board keeps its height', back.board.h, wide.h);
+  eq('the restored board is the right length', back.board.length, wide.w * wide.h);
+  check('the restored wide board takes a piece',
+    C.fits(back.board, C.spawnPiece(back.board, [0, 1])));
+  check('the restored wide board still has its clogs', C.countClogs(back.board) > 0);
+
+  // A board whose length disagrees with its stated size is nonsense.
+  const lied = JSON.parse(JSON.stringify(raw));
+  lied.w = C.BASE_W;
+  eq('a size that does not match the board is refused', S.decode(lied, LIMITS), null);
+
+  const noSize = JSON.parse(JSON.stringify(raw));
+  delete noSize.w;
+  eq('a record with no size at all is refused', S.decode(noSize, LIMITS), null);
+
+  const huge = JSON.parse(JSON.stringify(raw));
+  huge.w = C.MAX_W + 1;
+  eq('a pipe wider than the game can build is refused', S.decode(huge, LIMITS), null);
 }
 
 /* ------------------------------------------------- refusing bad records */
@@ -110,9 +147,9 @@ function sampleGame() {
   eq('an impossible link is refused',
     S.decode(mangle((c) => { c.board[0] = [1, 0, 'sideways']; }), LIMITS), null);
   eq('a piece off the right edge is refused',
-    S.decode(mangle((c) => { c.piece[0] = C.W; }), LIMITS), null);
+    S.decode(mangle((c) => { c.piece[0] = c.w; }), LIMITS), null);
   eq('a piece below the floor is refused',
-    S.decode(mangle((c) => { c.piece[1] = C.H; }), LIMITS), null);
+    S.decode(mangle((c) => { c.piece[1] = c.h; }), LIMITS), null);
   eq('a piece with a bad rotation is refused',
     S.decode(mangle((c) => { c.piece[2] = 7; }), LIMITS), null);
   eq('a piece with a bad colour is refused',

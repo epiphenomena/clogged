@@ -181,6 +181,15 @@ const Sv = global.self.Save;
 /* ------------------------------------------------------------------ boot */
 require(path.join(ROOT, 'game.js'));
 
+// Every sprite and the scene bitmap are offscreen canvases, so counting them
+// is how this test sees a relayout happen.
+let canvasesMade = 0;
+const _createElement = global.document.createElement;
+global.document.createElement = (tag) => {
+  if (tag === 'canvas') canvasesMade++;
+  return _createElement(tag);
+};
+
 const el = (id) => global.document.getElementById(id);
 const visible = (id) => !el(id).classes.has('hidden');
 
@@ -254,6 +263,13 @@ C.tryMove = function (board, piece, dc, dr) {
   }
   return next;
 };
+// The live piece: the game asks for its drop distance every frame it renders.
+let livePiece = null;
+const _dropDistance = C.dropDistance;
+C.dropDistance = function (board, piece) {
+  if (!simulating) livePiece = piece;
+  return _dropDistance(board, piece);
+};
 let lastRotateDir = 0;
 const _rotate = C.tryRotate;
 C.tryRotate = function (board, piece, dir) { lastRotateDir = dir; return _rotate(board, piece, dir); };
@@ -266,18 +282,22 @@ C.seedLevel = function (level, rand) {
   return built;
 };
 const _spawn = C.spawnPiece;
-C.spawnPiece = function (colors) { pendingSpawn = true; liveColors = colors.slice(); return _spawn(colors); };
+C.spawnPiece = function (board, colors) {
+  pendingSpawn = true;
+  liveColors = colors.slice();
+  return _spawn(board, colors);
+};
 
-function cloneBoard(b) {
-  return b.map((c) => (c ? { color: c.color, type: c.type, link: c.link } : null));
-}
+// Copies keep their geometry; a plain map() would strip it and every index
+// calculation downstream would be wrong.
+const cloneBoard = C.cloneBoard;
 
 // Runs of two or three that a future piece could extend into a match.
 function setupBonus(b) {
   let pairs = 0, triples = 0;
   const scan = (get) => {
     let run = 1;
-    for (let i = 1; i <= (get === rowGet ? C.W : C.H); i++) {
+    for (let i = 1; i <= (get === rowGet ? b.w : b.h); i++) {
       const a = get(i - 1), n = get(i);
       if (a && n && a.color === n.color) run++;
       else {
@@ -288,16 +308,16 @@ function setupBonus(b) {
     }
   };
   let rowGet = null;
-  for (let r = 0; r < C.H; r++) {
+  for (let r = 0; r < b.h; r++) {
     const rr = r;
-    rowGet = (i) => (i < C.W ? b[C.idx(i, rr)] : null);
+    rowGet = (i) => (i < b.w ? b[C.idx(b, i, rr)] : null);
     scan(rowGet);
   }
-  for (let c = 0; c < C.W; c++) {
+  for (let c = 0; c < b.w; c++) {
     const cc = c;
-    const colGet = (i) => (i < C.H ? b[C.idx(cc, i)] : null);
+    const colGet = (i) => (i < b.h ? b[C.idx(b, cc, i)] : null);
     let run = 1;
-    for (let i = 1; i <= C.H; i++) {
+    for (let i = 1; i <= b.h; i++) {
       const a = colGet(i - 1), n = colGet(i);
       if (a && n && a.color === n.color) run++;
       else {
@@ -312,16 +332,16 @@ function setupBonus(b) {
 
 function shapeCost(b) {
   let holes = 0, aggregate = 0, maxH = 0;
-  for (let c = 0; c < C.W; c++) {
+  for (let c = 0; c < b.w; c++) {
     let top = -1;
-    for (let r = 0; r < C.H; r++) {
-      if (b[C.idx(c, r)]) { top = r; break; }
+    for (let r = 0; r < b.h; r++) {
+      if (b[C.idx(b, c, r)]) { top = r; break; }
     }
     if (top === -1) continue;
-    const h = C.H - top;
+    const h = b.h - top;
     aggregate += h;
     if (h > maxH) maxH = h;
-    for (let r = top + 1; r < C.H; r++) if (!b[C.idx(c, r)]) holes++;
+    for (let r = top + 1; r < b.h; r++) if (!b[C.idx(b, c, r)]) holes++;
   }
   return { holes, aggregate, maxH };
 }
@@ -334,7 +354,7 @@ function bestPlacement(board, colors) {
   simulating = true;
   for (let orient = 0; orient < 4; orient++) {
     const r0 = orient === 1 ? 1 : 0;
-    for (let col = 0; col < C.W; col++) {
+    for (let col = 0; col < board.w; col++) {
       const piece = { c: col, r: r0, orient, colors };
       if (!C.fits(board, piece)) continue;
       const sim = cloneBoard(board);
@@ -355,7 +375,7 @@ function bestPlacement(board, colors) {
 
 function driveMove(plan) {
   for (let i = 0; i < plan.orient; i++) global.document.fire('keydown', { key: 'x' });
-  let cur = (C.W >> 1) - 1; // spawn anchor column
+  let cur = (liveBoard.w >> 1) - 1; // spawn anchor column, on this pipe
   while (cur < plan.col) { global.document.fire('keydown', { key: 'ArrowRight' }); cur++; }
   while (cur > plan.col) { global.document.fire('keydown', { key: 'ArrowLeft' }); cur--; }
   global.document.fire('keydown', { key: ' ' });
@@ -383,9 +403,12 @@ function playSmart(maxFrames) {
 }
 
 /* --------------------------------------------------- play and win a level */
-function startAt(level) {
+function pick(level) {
   for (let i = 0; i < 25; i++) el('lv-down').fire('click');
   for (let i = 0; i < level; i++) el('lv-up').fire('click');
+}
+function startAt(level) {
+  pick(level);
   el('btn-start').fire('click');
 }
 
@@ -675,9 +698,59 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
 
   // They must settle low rather than perch on top of a stack.
   const highest = liveBoard.reduce((best, cell, i) =>
-    cell && cell.type === 'clog' ? Math.min(best, C.rowOf(i)) : best, C.H);
+    cell && cell.type === 'clog' ? Math.min(best, C.rowOf(liveBoard, i)) : best, liveBoard.h);
   check('arrivals do not stack up near the ceiling', highest >= 2,
     'topmost clog row=' + highest);
+
+  el('btn-pause').fire('click');
+  el('btn-new-game').fire('click');
+}
+
+/* ------------------------------------------- the pipe grows with the levels */
+{
+  startAt(4);   // the last level played on the opening pipe
+  const narrow = liveBoard;
+  check('the early levels use the pipe the game opens with',
+    narrow.w === C.BASE_W && narrow.h === C.BASE_H, narrow.w + 'x' + narrow.h);
+
+  pick(5);
+  canvasesMade = 0;
+  el('btn-start').fire('click');
+  tick(16);
+  const wide = liveBoard;
+  check('a later level is played on a wider pipe', wide.w > narrow.w,
+    narrow.w + ' -> ' + wide.w);
+  check('and a proportionally taller one', wide.h === wide.w * 2,
+    wide.w + 'x' + wide.h);
+  check('the board really holds that many cells', wide.length === wide.w * wide.h,
+    wide.length + ' vs ' + wide.w * wide.h);
+  // Smaller fittings mean every sprite has to be redrawn; without this the
+  // pieces would be painted at the old size on the new grid.
+  check('changing the size of the pipe rebuilds the artwork', canvasesMade > 0,
+    'canvases=' + canvasesMade);
+
+  // Aiming has to reach the whole pipe. A column limit left at the opening
+  // width would strand the last few columns of a wider one.
+  const boardEl = el('board');
+  boardEl.fire('pointerdown', { pointerId: 21, clientX: 20, clientY: 90 });
+  tick(16);
+  for (let x = 40; x <= 380; x += 20) {
+    boardEl.fire('pointermove', { pointerId: 21, clientX: x, clientY: 92 });
+    tick(16);
+  }
+  boardEl.fire('pointerup', { pointerId: 21, clientX: 380, clientY: 92 });
+  tick(16);
+  // A lying coupling's partner takes the last column, so its anchor stops one
+  // short of the wall.
+  check('a drag can reach the far side of the wider pipe',
+    livePiece && livePiece.c >= wide.w - 2,
+    'anchor column=' + (livePiece && livePiece.c) + ' of ' + wide.w);
+
+  // Arrivals have to work on the new geometry too, not just the opening one.
+  check('the wider pipe still holds clogs back',
+    C.clogSeedCount(5) < C.clogTotal(5));
+  check('the wider pipe seeds clogs low down',
+    liveBoard.slice(0, C.seedTopRow(5, wide.h) * wide.w).every((x) => x === null));
 
   el('btn-pause').fire('click');
   el('btn-new-game').fire('click');
@@ -712,7 +785,7 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
 
 /* ---------------------------------------------------------- suspended games */
 {
-  const LIMITS = { cells: C.W * C.H, cols: C.W, colors: C.COLORS, maxLevel: C.MAX_LEVEL };
+  const LIMITS = { maxW: C.MAX_W, maxH: C.MAX_H, colors: C.COLORS, maxLevel: C.MAX_LEVEL };
   const stored = () => Sv.decode(JSON.parse(store.get('clogged.save') || 'null'), LIMITS);
 
   startAt(6);
@@ -722,7 +795,7 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
     'raw=' + String(store.get('clogged.save')).slice(0, 40));
   check('the snapshot knows the level', mid && mid.level === 6, 'level=' + (mid && mid.level));
   check('the snapshot carries a board',
-    mid && mid.board.length === C.W * C.H);
+    mid && mid.board.length === mid.board.w * mid.board.h);
   check('the snapshot keeps the clogs',
     mid && C.countClogs(mid.board) > 0, 'clogs=' + (mid && C.countClogs(mid.board)));
   check('the snapshot carries the queue', mid && Array.isArray(mid.pending));
@@ -810,7 +883,7 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   // A corrupt record must never boot the game into a broken state.
   el('btn-pause').fire('click');
   el('btn-new-game').fire('click');
-  store.set('clogged.save', '{"v":2,"board":"nonsense"}');
+  store.set('clogged.save', '{"v":' + Sv.VERSION + ',"board":"nonsense"}');
   el('btn-scores').fire('click');
   el('btn-scores-back').fire('click');
   check('a corrupt snapshot offers no resume',
@@ -845,8 +918,8 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   for (let f = 0; f < 30000 && longest <= want; f++) {
     if (pendingSpawn) {
       pendingSpawn = false;
-      spread = (spread + 3) % (C.W - 1);
-      let cur = (C.W >> 1) - 1;
+      spread = (spread + 3) % (liveBoard.w - 1);
+      let cur = (liveBoard.w >> 1) - 1;
       while (cur < spread) { global.document.fire('keydown', { key: 'ArrowRight' }); cur++; }
       while (cur > spread) { global.document.fire('keydown', { key: 'ArrowLeft' }); cur--; }
     }
