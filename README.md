@@ -20,7 +20,7 @@ Couplings fall in pairs of two coloured halves. Land them so four same-coloured
 cells line up and the whole run dissolves. Hairballs count toward a run, so the
 goal is always to build lines *through* them.
 
-Three details make or break a plan:
+A few details make or break a plan:
 
 - **Hairballs never fall.** They stay wherever the level wedged them, even with
   nothing underneath, so you can build up to one.
@@ -29,8 +29,9 @@ Three details make or break a plan:
   lose their bolted flange and shrink to a plain plug, so you can see at a glance
   which pieces are free.
 - **Clogs keep coming.** A level's quota is not all sitting there at the start.
-  The harder the level, the smaller the share wedged in when it opens — the rest
-  wash down the pipe as you play — one every few couplings, aimed at the deepest column so it settles low.
+  The harder the level, the smaller the share wedged in when it opens; the rest
+  wash down the pipe while you play, one every few couplings, aimed at the
+  deepest column so each settles low.
   Sometimes one catches on something it brushes past on the way down and wedges
   there instead, leaving an overhang to build under; it will only ever snag low
   enough in the pipe that a line can still be run through it. The counter in the
