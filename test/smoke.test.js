@@ -241,6 +241,19 @@ C.pressureStep = function (level, elapsed) {
 let lockCount = 0;
 const _lockPiece = C.lockPiece;
 C.lockPiece = function (board, piece) { lockCount++; return _lockPiece(board, piece); };
+// Sideways movement is what the swipe-down fix is about, so it has to be
+// observable: every accepted horizontal step lands here.
+let sideSteps = 0;
+let downSteps = 0;
+const _tryMove = C.tryMove;
+C.tryMove = function (board, piece, dc, dr) {
+  const next = _tryMove(board, piece, dc, dr);
+  if (next && !simulating) {
+    if (dc !== 0) sideSteps++;
+    if (dr > 0) downSteps++;
+  }
+  return next;
+};
 let lastRotateDir = 0;
 const _rotate = C.tryRotate;
 C.tryRotate = function (board, piece, dir) { lastRotateDir = dir; return _rotate(board, piece, dir); };
@@ -478,6 +491,17 @@ board.fire('pointerup', { pointerId: 4, clientX: 150, clientY: 280 });
 tick(16);
 check('swiping up spins clockwise', lastRotateDir === 1, 'dir=' + lastRotateDir);
 
+// A fast sideways swipe droops a little on the way across, and that droop must
+// not read as a slam.
+const beforeSwipe = lockCount;
+board.fire('pointerdown', { pointerId: 6, clientX: 60, clientY: 240 });
+tick(16);
+board.fire('pointermove', { pointerId: 6, clientX: 300, clientY: 300 });
+board.fire('pointerup', { pointerId: 6, clientX: 300, clientY: 300 });
+tick(16);
+check('a fast sideways swipe is not a slam', lockCount === beforeSwipe,
+  'locks ' + beforeSwipe + ' -> ' + lockCount);
+
 // A fast downward flick slams the piece home: a piece must lock. Counting
 // locks rather than segments, since the landing may immediately clear a line.
 const beforeFlick = lockCount;
@@ -488,6 +512,40 @@ board.fire('pointerup', { pointerId: 3, clientX: 152, clientY: 380 });
 for (let i = 0; i < 40; i++) tick(16);
 check('a downward flick slams the piece home', lockCount > beforeFlick,
   'locks ' + beforeFlick + ' -> ' + lockCount);
+
+// Aim sideways, then keep dragging down without lifting. A thumb travelling
+// down a phone screen arcs — here 5px sideways for every 14px down — and that
+// arc must not slide the coupling out of the column it was just aimed at.
+// Done on the coupling that follows the slam, pinned to the left wall first so
+// the result cannot depend on where the previous one happened to be: without
+// that, a piece already against the right wall absorbs the unwanted step and
+// the test passes for the wrong reason.
+check('a new coupling arrives after the slam', pendingSpawn);
+sideSteps = 0;
+for (let i = 0; i < 8; i++) global.document.fire('keydown', { key: 'ArrowLeft' });
+check('the new coupling is live and walks to the wall', sideSteps > 0,
+  'side steps=' + sideSteps);
+
+board.fire('pointerdown', { pointerId: 5, clientX: 120, clientY: 120 });
+tick(16);
+for (let x = 140; x <= 200; x += 20) {          // aim: two columns to the right
+  board.fire('pointermove', { pointerId: 5, clientX: x, clientY: 120 });
+  tick(16);
+}
+sideSteps = 0;
+downSteps = 0;
+for (let i = 1; i <= 8; i++) {
+  board.fire('pointermove', { pointerId: 5, clientX: 200 + i * 5, clientY: 120 + i * 14 });
+  tick(16);   // 14px per frame is 0.875px/ms — a drag, well short of a flick
+}
+check('a slow drag down does not slide the coupling sideways', sideSteps === 0,
+  'side steps=' + sideSteps);
+// ...and it is still a soft drop, or the assertion above would pass on a
+// control that had simply stopped working.
+check('a slow drag down still walks the coupling downward', downSteps >= 2,
+  'down steps=' + downSteps);
+board.fire('pointerup', { pointerId: 5, clientX: 240, clientY: 232 });
+tick(16);
 
 // Keyboard rotation matches: Z / ArrowUp counter-clockwise, X clockwise.
 lastRotateDir = 0;

@@ -155,20 +155,74 @@ function lcg(seed) {
   eq('anchor links right', cells[0].link, 'right');
   eq('partner links back', cells[1].link, 'left');
 }
+
+/* Rotating in a confined space. One case per bullet of the documented rule,
+   so the README and the kick list cannot drift apart. */
 {
+  // Flush against the right wall: the pair pulls back off it rather than
+  // failing or hopping over it.
   const b = C.makeBoard();
-  const p = { c: C.W - 1, r: 5, orient: 1, colors: [0, 1] }; // vertical, flush right
-  const rotated = C.tryRotate(b, p, 1);
+  const p = { c: C.W - 1, r: 5, orient: 1, colors: [0, 1] }; // standing, right wall
+  const rotated = C.tryRotate(b, p, -1);                     // partner wants the wall
   check('rotation kicks off the right wall', rotated !== null);
-  const cells = C.pieceCells(rotated);
-  check('kicked piece is in bounds', cells.every(c => C.inBounds(c.c, c.r)));
+  eq('the wall kick shifts exactly one column', rotated.c, C.W - 2);
+  check('kicked piece is in bounds',
+    C.pieceCells(rotated).every(c => C.inBounds(c.c, c.r)));
+
+  // And off the left wall, the same distance the other way.
+  const q = { c: 0, r: 5, orient: 1, colors: [0, 1] };
+  const left = C.tryRotate(b, q, 1);                         // partner wants column -1
+  check('rotation kicks off the left wall', left !== null);
+  eq('the left wall kick shifts one column', left.c, 1);
 }
 {
+  // Standing up while resting on the floor: the pair lifts a row.
+  const b = C.makeBoard();
+  const p = { c: 3, r: C.H - 1, orient: 0, colors: [0, 1] }; // lying on the floor
+  const up = C.tryRotate(b, p, -1);                          // partner wants the row below
+  check('a coupling on the floor can still stand up', up !== null);
+  eq('the floor kick lifts exactly one row', up.r, C.H - 2);
+  eq('the anchor keeps its column', up.c, 3);
+}
+{
+  // A kick never gains a row. Blocked above and pinched on both sides, the
+  // rotation is refused — it does not drop into the gap below.
+  const b = C.makeBoard();
+  put(b, 3, 4, seg(0));   // directly above the anchor
+  put(b, 2, 4, seg(0));   // and above both sideways kicks
+  put(b, 4, 4, seg(0));
+  const p = { c: 3, r: 5, orient: 0, colors: [0, 1] };
+  eq('a rotation that would need to fall a row is refused', C.tryRotate(b, p, 1), null);
+
+  // The row below is genuinely free, which is what makes this a real test.
+  check('the cell it declined to drop into is empty', at(b, 3, 6) === null);
+}
+{
+  // The one exception: at the mouth of the pipe there is no row above to
+  // borrow, so a coupling there drops a row in order to stand up.
   const b = C.makeBoard();
   const p = { c: 3, r: 0, orient: 0, colors: [0, 1] };
-  const rotated = C.tryRotate(b, p, 1); // would need row -1
-  check('rotation at the ceiling kicks down instead of failing', rotated !== null);
+  const rotated = C.tryRotate(b, p, 1);   // would otherwise need row -1
+  check('rotation at the mouth still turns', rotated !== null);
+  eq('it drops exactly one row', rotated.r, 1);
   check('no cell above the board', C.pieceCells(rotated).every(c => c.r >= 0));
+}
+{
+  // A one-wide well: no room either side at the piece's row or the row above,
+  // so the coupling stays lying down whichever way it is turned.
+  const b = C.makeBoard();
+  for (const c of [2, 4]) for (let r = C.H - 3; r < C.H; r++) put(b, c, r, seg(0));
+  const p = { c: 3, r: C.H - 2, orient: 1, colors: [0, 1] }; // standing in the well
+  eq('a standing coupling cannot lie down in a one-wide well',
+    C.tryRotate(b, p, 1), null);
+  eq('nor the other way round', C.tryRotate(b, p, -1), null);
+
+  // Lower the well by a row and the same turn happens above it.
+  const shallow = C.makeBoard();
+  for (const c of [2, 4]) for (let r = C.H - 2; r < C.H; r++) put(shallow, c, r, seg(0));
+  const over = C.tryRotate(shallow, p, 1);
+  check('a coupling turns a row higher when the well is shallow', over !== null);
+  eq('and only one row higher', over.r, C.H - 3);
 }
 {
   const b = C.makeBoard();

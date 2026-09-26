@@ -215,14 +215,51 @@
     return fits(board, next) ? next : null;
   }
 
-  // Rotation with wall/floor kicks so the piece still turns when it is flush
-  // against an edge or another stack.
-  var KICKS = [[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1], [-1, 1], [1, 1]];
+  /*
+   * Rotation in a confined space.
+   *
+   * A quarter turn leaves the anchor where it is and swings the partner around
+   * it. When the partner's destination is taken, the pair may shift by one cell
+   * — a kick — and the offsets are tried in a fixed order so the same situation
+   * always resolves the same way:
+   *
+   *   1. in place;
+   *   2. one cell away from whatever is in the way — sideways when the coupling
+   *      is lying down against a wall or a stack, upward when it is standing up
+   *      off the floor;
+   *   3. one cell sideways, for a standing turn that is pinched between
+   *      neighbours.
+   *
+   * A kick never moves the pair downward: gaining a row on a turn would let a
+   * coupling slip past a slot the player could still have slid into. The sole
+   * exception is the mouth of the pipe, where there is no row above to borrow,
+   * so a coupling at row 0 drops one row in order to stand up.
+   *
+   * Anything still blocked after that is refused and the coupling keeps its
+   * current orientation — in a one-wide well, with no room on either side at
+   * its own row or the row above, it simply stays lying down.
+   */
+  function kicksFor(p, orient) {
+    var off = OFFSETS[orient];
+    var list = [[0, 0]];
+    if (off[0] !== 0) {           // turning to lie down
+      list.push([-off[0], 0]);    // pull back off the wall or the stack
+      list.push([0, -1]);         // or lift a row and turn above the blockage
+    } else if (off[1] > 0) {      // standing up with the partner below
+      list.push([0, -1]);         // floor kick
+      list.push([-1, 0], [1, 0]);
+    } else {                      // standing up with the partner above
+      list.push([-1, 0], [1, 0]);
+    }
+    if (p.r === 0) list.push([0, 1]);
+    return list;
+  }
 
   function tryRotate(board, p, dir) {
     var orient = (p.orient + (dir > 0 ? 1 : 3)) % 4;
-    for (var i = 0; i < KICKS.length; i++) {
-      var next = movedPiece(p, KICKS[i][0], KICKS[i][1], orient);
+    var kicks = kicksFor(p, orient);
+    for (var i = 0; i < kicks.length; i++) {
+      var next = movedPiece(p, kicks[i][0], kicks[i][1], orient);
       if (fits(board, next)) return next;
     }
     return null;

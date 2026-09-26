@@ -13,6 +13,9 @@
   var TAP_MS = 280;       // a press shorter than this, that barely moved, is a tap
   var TAP_SLOP = 11;      // px of movement still considered a tap
   var FLICK_VY = 1.0;     // px/ms downward to count as a slam
+  var AXIS_BIAS = 1.5;    // one axis must beat the other by this to own the move
+  var AXIS_DEAD = 3;      // px of recent travel below which nothing has a direction
+  var AXIS_DECAY = 0.6;   // how much of the last window's travel carries over
 
   var reduceMotion = self.matchMedia
     && self.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1339,8 +1342,9 @@
       id: e.pointerId,
       x0: e.clientX, y0: e.clientY,
       col0: S.piece.c, row0: S.piece.r,
-      t0: perf(), lastY: e.clientY, lastT: perf(),
-      vy: 0, moved: false, dropped: false, spun: false
+      t0: perf(), lastX: e.clientX, lastY: e.clientY, lastT: perf(),
+      vx: 0, vy: 0, rx: 0, ry: 0,
+      moved: false, dropped: false, spun: false
     };
   });
 
@@ -1351,21 +1355,38 @@
     var now = perf();
     var dx = e.clientX - gesture.x0;
     var dy = e.clientY - gesture.y0;
+    var ex = e.clientX - gesture.lastX;
+    var ey = e.clientY - gesture.lastY;
     var span = now - gesture.lastT;
-    if (span > 0) gesture.vy = (e.clientY - gesture.lastY) / span;
+    if (span > 0) {
+      gesture.vx = ex / span;
+      gesture.vy = ey / span;
+    }
+    gesture.lastX = e.clientX;
     gesture.lastY = e.clientY;
     gesture.lastT = now;
     if (Math.abs(dx) > TAP_SLOP || Math.abs(dy) > TAP_SLOP) gesture.moved = true;
 
-    // A decisive downward flick slams immediately, rather than on release.
-    if (gesture.vy > FLICK_VY && dy > view.cell * 1.2) {
+    // Which way the finger is travelling *now*, not where the gesture began:
+    // a decaying window of recent travel, so aiming and dropping can follow one
+    // another within a single drag without either bleeding into the other.
+    gesture.rx = gesture.rx * AXIS_DECAY + Math.abs(ex);
+    gesture.ry = gesture.ry * AXIS_DECAY + Math.abs(ey);
+    var downward = gesture.ry > AXIS_DEAD && gesture.ry > gesture.rx * AXIS_BIAS;
+
+    // A decisive downward flick slams immediately, rather than on release. The
+    // velocity has to be going mostly down, or a fast sideways swipe with a
+    // little droop in it would count.
+    if (gesture.vy > FLICK_VY && dy > view.cell * 1.2
+      && Math.abs(gesture.vy) > Math.abs(gesture.vx) * AXIS_BIAS) {
       gesture.dropped = true;
       hardDrop();      // clears `gesture`; the local reference is dead after this
       return;
     }
 
     // Swipe up spins the other way from a tap.
-    if (!gesture.spun && dy < -view.cell * 0.85 && Math.abs(dy) > Math.abs(dx)) {
+    if (!gesture.spun && dy < -view.cell * 0.85
+      && Math.abs(dy) > Math.abs(dx) * AXIS_BIAS) {
       gesture.spun = true;
       rotate(1);
       // Re-anchor so the same drag can keep steering afterwards.
@@ -1376,9 +1397,20 @@
       return;
     }
 
-    steer(
-      Math.max(0, Math.min(W - 1, gesture.col0 + Math.round(dx / view.cell))),
-      dy > view.cell * 0.5 ? gesture.row0 + Math.floor(dy / view.cell) : -1);
+    var row = dy > view.cell * 0.5 ? gesture.row0 + Math.floor(dy / view.cell) : -1;
+    if (downward) {
+      // While the finger is heading down, only the downward part counts. The
+      // sideways wobble in a swipe down used to drag the coupling out of the
+      // column the player had already aimed at. Carrying the horizontal anchor
+      // along with the finger also means that wobble does not accumulate into a
+      // jump sideways the moment aiming resumes.
+      gesture.x0 = e.clientX;
+      gesture.col0 = S.piece.c;
+      if (row > S.piece.r) dropToRow(row);
+      return;
+    }
+
+    steer(Math.max(0, Math.min(W - 1, gesture.col0 + Math.round(dx / view.cell))), row);
   }, { passive: false });
 
   function endGesture(e) {
