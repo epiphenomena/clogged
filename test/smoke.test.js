@@ -713,13 +713,21 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   check('the early levels use the pipe the game opens with',
     narrow.w === C.BASE_W && narrow.h === C.BASE_H, narrow.w + 'x' + narrow.h);
 
-  pick(5);
+  // The path a player actually takes across the boundary: clear level 4 and
+  // walk into level 5, with a coupling about to spawn on a board that has just
+  // been replaced by a differently sized one.
+  const won = clearLevel(6);
+  check('the player can clear the last level on the opening pipe', won.cleared,
+    'over=' + won.over + ' frames=' + won.frames);
   canvasesMade = 0;
-  el('btn-start').fire('click');
+  el('btn-next-level').fire('click');
   tick(16);
   const wide = liveBoard;
-  check('a later level is played on a wider pipe', wide.w > narrow.w,
+  check('advancing a level can change the pipe', wide.w > narrow.w,
     narrow.w + ' -> ' + wide.w);
+  check('the first coupling of the new level spawns mid-pipe',
+    livePiece && livePiece.c === (wide.w >> 1) - 1,
+    'column=' + (livePiece && livePiece.c) + ' of ' + wide.w);
   check('and a proportionally taller one', wide.h === wide.w * 2,
     wide.w + 'x' + wide.h);
   check('the board really holds that many cells', wide.length === wide.w * wide.h,
@@ -751,6 +759,8 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
     C.clogSeedCount(5) < C.clogTotal(5));
   check('the wider pipe seeds clogs low down',
     liveBoard.slice(0, C.seedTopRow(5, wide.h) * wide.w).every((x) => x === null));
+  check('the new level kept the running score',
+    Number(el('hud-score').textContent) > 0, el('hud-score').textContent);
 
   el('btn-pause').fire('click');
   el('btn-new-game').fire('click');
@@ -888,6 +898,21 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   el('btn-scores-back').fire('click');
   check('a corrupt snapshot offers no resume',
     el('btn-resume-saved').classes.has('hidden'));
+  // A perfectly valid snapshot from an older build: everyone upgrading has one
+  // of these sitting in storage, and it must go quietly rather than offering a
+  // button that cannot deliver.
+  store.set('clogged.save', JSON.stringify({
+    v: 2, level: 3, score: 900,
+    board: new Array(C.BASE_W * C.BASE_H).fill(0).map((_, i) =>
+      (i > C.BASE_W * 14 ? [0, 1, 0] : 0)),
+    piece: [3, 0, 0, 1, 2], next: [0, 1], pending: [1],
+    sinceDrip: 0, elapsed: 10, pressure: 0, locks: 1, recorded: false
+  }));
+  el('btn-scores').fire('click');
+  el('btn-scores-back').fire('click');
+  check('a snapshot from an older build offers no resume',
+    el('btn-resume-saved').classes.has('hidden'));
+
   store.set('clogged.save', 'not json at all');
   el('btn-scores').fire('click');
   el('btn-scores-back').fire('click');

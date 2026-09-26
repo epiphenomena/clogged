@@ -599,6 +599,18 @@ function lcg(seed) {
   check('fully wound up is still faster than the start', maxed < fresh,
     fresh + ' -> ' + maxed);
 
+  // The worst case the game can produce: the last level, on the tallest pipe,
+  // fully wound up. Short rows make short intervals, so this is the number that
+  // has to stay playable rather than the base one.
+  const worst = C.fallInterval(C.MAX_LEVEL,
+    C.pressureGrace(C.MAX_LEVEL) + C.PRESSURE_STEP_MS * 999,
+    C.dimsFor(C.MAX_LEVEL).h);
+  check('even the worst case leaves time to react', worst >= 70,
+    Math.round(worst) + 'ms per row');
+  check('and a coupling still takes over a second to cross the pipe',
+    worst * C.dimsFor(C.MAX_LEVEL).h > 1500,
+    Math.round(worst * C.dimsFor(C.MAX_LEVEL).h) + 'ms end to end');
+
   // Reaching the cap should take minutes of stalling, not seconds.
   const toCap = grace + C.PRESSURE_STEP_MS * (C.PRESSURE_MAX_STEPS - 1);
   check('reaching full pressure takes over four minutes', toCap > 240000,
