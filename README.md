@@ -188,8 +188,9 @@ snapshot round-trips and every way a stored record can be malformed. The last
 stubs enough DOM and
 canvas for [`game.js`](game.js) to run headlessly, then drives it with a greedy
 player that clears levels — so wiring and state-machine regressions get caught
-without a browser. All four are plain node scripts with no dependencies; run
-them before you push.
+without a browser. All four are plain scripts with no dependencies; run them
+before you push. They use nothing beyond the language, so any of node, `bun`, or
+`deno run -A` will do.
 
 | File | What's in it |
 | --- | --- |
