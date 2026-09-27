@@ -604,41 +604,30 @@
     glyph(ctx, cx, cy, s, color, 0.8);
   }
 
-  // The mat on a matted clog, drawn over the plain hairball: a braided collar of
-  // strands wound round it and two bands lashed across its face. The bands give
-  // it a different outline, not just a different colour, so it reads without
-  // colour vision too. The first flush strips this off.
+  // The mat on a matted clog, drawn over the plain hairball: two braided
+  // collars of strands wound tight round it. That hard double ring changes the
+  // clog's outline, not just its colour, so it reads without colour vision; the
+  // glyph is redrawn on top so the mat never hides which shape it is. The first
+  // flush strips this off.
   function drawMat(ctx, x, y, s, color) {
     var P = PALETTE[color];
     var cx = x + s / 2, cy = y + s / 2;
-    var R = s * 0.36;
     ctx.save();
     ctx.lineCap = 'round';
-
-    // braided collar: short overlapping arcs, alternating dark and pale
-    for (var k = 0; k < 18; k++) {
-      var a0 = (k / 18) * Math.PI * 2;
-      ctx.strokeStyle = k % 2 ? P.deep : P.light;
-      ctx.globalAlpha = k % 2 ? 0.95 : 0.75;
-      ctx.lineWidth = Math.max(1.2, s * 0.07);
-      ctx.beginPath();
-      ctx.arc(cx, cy, R + (k % 2 ? 0 : s * 0.02), a0, a0 + Math.PI / 7);
-      ctx.stroke();
+    var rings = [s * 0.4, s * 0.31];
+    for (var ring = 0; ring < rings.length; ring++) {
+      for (var k = 0; k < 16; k++) {
+        var a0 = (k / 16) * Math.PI * 2 + ring * 0.2;
+        ctx.strokeStyle = k % 2 ? '#1a1220' : P.light;
+        ctx.globalAlpha = k % 2 ? 0.9 : 0.85;
+        ctx.lineWidth = Math.max(1.2, s * (ring ? 0.05 : 0.065));
+        ctx.beginPath();
+        ctx.arc(cx, cy, rings[ring], a0, a0 + Math.PI / 7);
+        ctx.stroke();
+      }
     }
-
-    // two bands lashed across, like twine round a parcel
-    ctx.globalAlpha = 0.9;
-    ctx.strokeStyle = '#1a1220';
-    ctx.lineWidth = Math.max(1.6, s * 0.1);
-    ctx.beginPath();
-    ctx.moveTo(cx - R * 0.8, cy - R * 0.55); ctx.lineTo(cx + R * 0.8, cy + R * 0.55);
-    ctx.moveTo(cx + R * 0.8, cy - R * 0.55); ctx.lineTo(cx - R * 0.8, cy + R * 0.55);
-    ctx.stroke();
-    ctx.strokeStyle = P.light;
-    ctx.globalAlpha = 0.7;
-    ctx.lineWidth = Math.max(0.8, s * 0.035);
-    ctx.stroke();
     ctx.restore();
+    glyph(ctx, cx, cy, s, color, 0.9);
   }
 
   /* ------------------------------------------------------------- sprites */
@@ -1699,6 +1688,13 @@
     } catch (e) { return fmtDate(t); }
   }
 
+  // Axis labels have a narrow gutter, and a run to the top can pass a million.
+  function fmtAxis(v) {
+    if (v >= 1e6) return +(v / 1e6).toFixed(1) + 'M';
+    if (v >= 1e4) return +(v / 1e3).toFixed(0) + 'k';
+    return fmtNum(v);
+  }
+
   // Round an axis maximum up to something a person would choose.
   function niceMax(v) {
     if (!(v > 0)) return 10;
@@ -1775,7 +1771,7 @@
       svg.push('<line x1="' + x0 + '" y1="' + y.toFixed(1) + '" x2="' + x1 + '" y2="' + y.toFixed(1)
         + '" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>');
       svg.push('<text x="' + (x0 - 6) + '" y="' + (y + 3).toFixed(1)
-        + '" text-anchor="end" class="ax">' + esc(fmtNum(v)) + '</text>');
+        + '" text-anchor="end" class="ax">' + esc(fmtAxis(v)) + '</text>');
     });
 
     // area wash under the line, then the line itself

@@ -43,28 +43,32 @@ A few details make or break a plan:
   proportionally faster so one still crosses the screen in about the same time.
   The level picker on the title screen names the pipe you are about to play in,
   and shows it behind the menu.
+- **Pressure builds, eventually.** Nothing changes for the first minute — longer
+  on a big level, which honestly takes longer to clear. After that the couplings
+  speed up a few percent every 30 seconds, topping out around 1.7× after five
+  and a half minutes of stalling. It punishes dithering, not ordinary play.
+
+Past level 16 the pipe has stopped growing and the speed is near its cap, so
+three things keep the difficulty climbing to the top — each one announced on
+the level it first turns up:
+
+- **Some clogs are matted.** From level 17 a share of the hairballs — arrivals
+  included — come bound in a double braided collar.
+  A line through one only strips the mat off (for half a clog's points) and
+  leaves a plain hairball where it was, which takes a second line to clear.
+  One in ten is matted at level 17, rising every level to about three in five
+  at level 50.
 - **Arrivals come in bursts.** From level 25 a clog can wash down with a
   second one straight behind it, before your next coupling. The chance starts
   at about one in seven and climbs every level to four in five at level 50.
 - **A fourth colour joins at level 34.** Couplings and clogs both come in lime
   as well from then on, so lining four up takes more planning. The level
   picker says how many colours a level uses.
-- **Some clogs are matted.** From level 17 a share of the hairballs — arrivals
-  included — come bound in a braided collar with two bands lashed across them.
-  A line through one only strips the mat off (for half a clog's points) and
-  leaves a plain hairball where it was, which takes a second line to clear.
-  One in ten is matted at level 17, rising every level to about three in five
-  at level 50.
-- **Pressure builds, eventually.** Nothing changes for the first minute — longer
-  on a big level, which honestly takes longer to clear. After that the couplings
-  speed up a few percent every 30 seconds, topping out around 1.7× after five
-  and a half minutes of stalling. It punishes dithering, not ordinary play.
-
 Chains multiply your score: each cascade step in a single landing doubles the
 multiplier, up to 16×.
 
 Each level's colours are dealt out evenly, so no single colour can run away with
-a board and strand the other two.
+a board and strand the others.
 
 ## Winning
 

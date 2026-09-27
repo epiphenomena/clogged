@@ -400,8 +400,8 @@ body.fx-active #hud { opacity: 0; pointer-events: none; }
 
 .trophy {
   display: block;
-  width: 120px;
-  height: 176px;
+  width: 140px;
+  height: 205px;
   margin: 0 auto 10px;
   filter: drop-shadow(0 0 18px color-mix(in srgb, var(--t-main) 45%, transparent));
 }
