@@ -90,6 +90,39 @@
   </div>
 </div>
 
+<div class="overlay hidden fx-panel" id="ov-win" data-trophy="gold">
+  <div class="panel">
+    <svg class="trophy" viewBox="0 0 120 176" role="img" aria-labelledby="win-metal">
+      <defs>
+        <linearGradient id="trophy-metal" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" class="t-dark"/>
+          <stop offset="0.3" class="t-light"/>
+          <stop offset="0.62" class="t-main"/>
+          <stop offset="1" class="t-dark"/>
+        </linearGradient>
+      </defs>
+      <g class="sparkle">
+        <path d="M18 34 l3 -9 l3 9 l9 3 l-9 3 l-3 9 l-3 -9 l-9 -3 z"/>
+        <path d="M96 20 l2 -6 l2 6 l6 2 l-6 2 l-2 6 l-2 -6 l-6 -2 z"/>
+        <path d="M100 76 l1.5 -4.5 l1.5 4.5 l4.5 1.5 l-4.5 1.5 l-1.5 4.5 l-1.5 -4.5 l-4.5 -1.5 z"/>
+      </g>
+      <circle cx="60" cy="14" r="8" fill="url(#trophy-metal)"/>
+      <rect x="54" y="14" width="12" height="84" rx="6" fill="url(#trophy-metal)"/>
+      <path d="M26 132 Q26 96 60 94 Q94 96 94 132 Z" fill="url(#trophy-metal)"/>
+      <ellipse cx="60" cy="132" rx="35" ry="5" class="t-rim"/>
+      <rect x="34" y="134" width="52" height="10" rx="2" class="t-rim"/>
+      <rect x="22" y="144" width="76" height="26" rx="3" class="plinth"/>
+      <rect x="38" y="150" width="44" height="13" rx="2" fill="url(#trophy-metal)"/>
+    </svg>
+    <h2 class="subtitle good">You win!</h2>
+    <p class="result-line" id="win-metal">Gold plunger</p>
+    <p class="result-line" id="win-score">Score: 0</p>
+    <p class="best-line" id="win-best"></p>
+    <button class="big-btn" id="btn-win-scores">SCORES</button>
+    <button class="ghost-btn" id="btn-win-menu">Menu</button>
+  </div>
+</div>
+
 <div class="overlay hidden" id="ov-scores">
   <div class="panel panel-wide">
     <h2 class="subtitle">Scores</h2>

@@ -54,6 +54,25 @@ multiplier, up to 16×.
 Each level's colours are dealt out evenly, so no single colour can run away with
 a board and strand the other two.
 
+## Winning
+
+There are 51 levels, 0 to 50. Flush level 50 and the game is won: the run is
+filed in the scores there and then, and the game stops on the win screen rather
+than starting over. The prize is a plunger on a plinth, cast in a metal set by
+the final score:
+
+| Metal | Final score |
+| --- | --- |
+| Bronze | under 150,000 |
+| Silver | 150,000 and up |
+| Gold | 500,000 and up |
+| Platinum | 1,000,000 and up |
+
+The level bonuses alone from level 0 to the top come to about 660,000, so a
+full climb earns at least gold; starting high up the level picker gets you a
+lesser metal. A won run keeps a small plunger in its metal beside it in the
+top-ten table.
+
 ## Scores
 
 Every finished run is kept on the device — when you top out, quit mid-run, or

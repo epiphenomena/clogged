@@ -31,6 +31,15 @@
     { light: '#f9c7ff', main: '#e879f9', dark: '#a132ba', deep: '#5c1a6b', rgb: '232,121,249' }
   ];
 
+  // The trophy's metal, by tier (see Core.trophyFor). style.css carries the
+  // same colours for the plunger on the win screen.
+  var TROPHY_METAL = {
+    bronze: { light: '#f6d2a8', main: '#c4803f', dark: '#6f4118' },
+    silver: { light: '#ffffff', main: '#c3cad6', dark: '#5f6778' },
+    gold: { light: '#fff3b0', main: '#f5c518', dark: '#8f6503' },
+    platinum: { light: '#f4fdff', main: '#aee3f0', dark: '#4d8397' }
+  };
+
   var $ = function (id) { return document.getElementById(id); };
 
   var boardCv = $('board'), bctx = boardCv.getContext('2d');
@@ -126,6 +135,12 @@
       });
     },
     // A thick descending glug.
+    fanfare: function () {
+      if (!this.init()) return;
+      [523, 659, 784, 1047, 784, 1047, 1319].forEach(function (f, i) {
+        Sound.tone(f, i === 6 ? 0.5 : 0.14, 'triangle', 0.09, 0.9 + i * 0.12);
+      });
+    },
     sludge: function () {
       this.sweep(200, 40, 1.1, 'sawtooth', 0.09);
       [160, 120, 90].forEach(function (f, i) {
@@ -137,7 +152,7 @@
   /* --------------------------------------------------------------- state */
 
   var S = {
-    phase: 'menu',        // menu | play | clearing | settling | paused | levelclear | gameover
+    phase: 'menu',        // menu | play | clearing | settling | paused | levelclear | gameover | won
     board: C.makeBoard(),
     piece: null,
     nextColors: C.randomColors(),
@@ -162,6 +177,7 @@
     toast: null,
     fx: null,
     hint: 1,              // fades out once the player gets going
+    trophy: null,         // the plunger's metal, once the last level is won
     locks: 0,
     recorded: false,     // has the current run been filed into history yet
     lastRunAt: 0,        // timestamp of the run just filed, for highlighting
@@ -935,22 +951,85 @@
     ctx.restore();
   }
 
+  // The winning plunger: it comes down the pipe, gives it two good pumps, and
+  // the last of the drain lets go in a flush that carries the win screen in.
+  function drawPlungerFx(ctx, p, vw, vh, t) {
+    var M = TROPHY_METAL[S.trophy] || TROPHY_METAL.gold;
+    var s = Math.min(vw * 0.34, vh * 0.2);          // width of the cup
+    var rest = view.y0 + view.rows * view.cell * 0.55;
+    var y;
+    if (p < 0.35) {
+      var d = p / 0.35;
+      y = -s * 2 + (rest + s * 2) * (1 - (1 - d) * (1 - d));
+    } else {
+      y = rest;
+    }
+    // two pumps: the cup squashes as the handle drives down
+    var pump = p >= 0.35 && p < 0.7 ? Math.abs(Math.sin((p - 0.35) / 0.35 * Math.PI * 2)) : 0;
+    var squash = 1 - pump * 0.28;
+    var cx = vw / 2;
+    var cupH = s * 0.62 * squash;
+    var handleLen = s * 2.1;
+    var push = pump * s * 0.18;
+
+    ctx.save();
+    // handle
+    var hw = s * 0.13;
+    var hg = ctx.createLinearGradient(cx - hw, 0, cx + hw, 0);
+    hg.addColorStop(0, M.dark);
+    hg.addColorStop(0.35, M.light);
+    hg.addColorStop(1, M.dark);
+    ctx.fillStyle = hg;
+    roundRect(ctx, cx - hw / 2, y - cupH - handleLen + push, hw, handleLen, [hw / 2, hw / 2, 0, 0]);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, y - cupH - handleLen + push, hw * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // cup
+    var cg = ctx.createLinearGradient(cx - s / 2, 0, cx + s / 2, 0);
+    cg.addColorStop(0, M.dark);
+    cg.addColorStop(0.3, M.light);
+    cg.addColorStop(0.6, M.main);
+    cg.addColorStop(1, M.dark);
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    ctx.moveTo(cx - s / 2 * (1 + pump * 0.12), y);
+    ctx.quadraticCurveTo(cx - s / 2, y - cupH, cx, y - cupH);
+    ctx.quadraticCurveTo(cx + s / 2, y - cupH, cx + s / 2 * (1 + pump * 0.12), y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = M.dark;
+    ctx.beginPath();
+    ctx.ellipse(cx, y, s / 2 * (1 + pump * 0.12), s * 0.07, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    if (p > 0.6) drawFlush(ctx, (p - 0.6) / 0.4, vw, vh, t);
+  }
+
   function startFx(kind, overlayId) {
     S.fx = {
       kind: kind,
       overlay: overlayId,
       t: 0,
-      dur: reduceMotion ? 260 : 1350,
+      dur: reduceMotion ? 260 : kind === 'plunger' ? 2600 : 1350,
       shown: false
     };
     document.body.classList.add('fx-active');
-    if (kind === 'flush') Sound.flush(); else Sound.sludge();
+    if (kind === 'flush') Sound.flush();
+    else if (kind === 'plunger') Sound.fanfare();
+    else Sound.sludge();
   }
 
   function drawFx(t) {
     if (!S.fx) return;
     var p = Math.min(1, S.fx.t / S.fx.dur);
     if (S.fx.kind === 'flush') drawFlush(bctx, p, view.vw, view.vh, t);
+    else if (S.fx.kind === 'plunger') {
+      if (reduceMotion) drawFlush(bctx, p, view.vw, view.vh, t);
+      else drawPlungerFx(bctx, p, view.vw, view.vh, t);
+    }
     else drawSludge(bctx, p, view.vw, view.vh, t);
   }
 
@@ -994,7 +1073,7 @@
   function show(id) { $(id).classList.remove('hidden'); }
   function hide(id) { $(id).classList.add('hidden'); }
   function hideAllOverlays() {
-    ['ov-menu', 'ov-pause', 'ov-clear', 'ov-gameover'].forEach(hide);
+    ['ov-menu', 'ov-pause', 'ov-clear', 'ov-gameover', 'ov-win'].forEach(hide);
   }
 
   function saveBest() {
@@ -1033,13 +1112,15 @@
 
   // A run ends when it tops out or when its score is about to be discarded.
   // Recorded once, so retrying after a game over does not file it twice.
-  function endRun() {
+  function endRun(won) {
     clearSave();
     saveBest();
     if (S.score <= 0 || S.recorded) return;
     S.recorded = true;
     S.lastRunAt = Date.now();
-    history = Sc.add(history, { s: S.score, l: S.level, t: S.lastRunAt });
+    var run = { s: S.score, l: S.level, t: S.lastRunAt };
+    if (won) run.w = 1;
+    history = Sc.add(history, run);
     Store.set('history', history);
   }
 
@@ -1106,13 +1187,28 @@
   function levelCleared() {
     S.phase = 'levelclear';
     S.score += 500 * (S.level + 1);
+    if (S.level >= C.MAX_LEVEL) { wonGame(); return; }
     saveBest();  // mid-run: bank the best, but the run is not over
     refreshHUD();
-    $('clear-info').textContent = S.level >= C.MAX_LEVEL
-      ? 'Level ' + S.level + ' flushed — that is the last one!'
-      : 'Level ' + S.level + ' flushed · Score ' + S.score;
-    $('btn-next-level').textContent = S.level >= C.MAX_LEVEL ? 'PLAY AGAIN' : 'NEXT LEVEL';
+    $('clear-info').textContent = 'Level ' + S.level + ' flushed · Score ' + S.score;
     startFx('flush', 'ov-clear');
+  }
+
+  // The last level is flushed: the run is over and it is filed as a win. The
+  // game stops here rather than starting over, and hands out a plunger whose
+  // metal is set by the final score.
+  function wonGame() {
+    S.phase = 'won';
+    S.piece = null;
+    endRun(true);
+    refreshHUD();
+    var metal = C.trophyFor(S.score);
+    S.trophy = metal;
+    $('ov-win').setAttribute('data-trophy', metal);
+    $('win-metal').textContent = metal.charAt(0).toUpperCase() + metal.slice(1) + ' plunger';
+    $('win-score').textContent = 'Score: ' + fmtNum(S.score);
+    $('win-best').textContent = S.score >= S.best ? 'A new best!' : 'Best: ' + fmtNum(S.best);
+    startFx('plunger', 'ov-win');
   }
 
   function beginClear(hits) {
@@ -1525,6 +1621,15 @@
     return step * mag;
   }
 
+  // A small plunger beside a run that won the game, in the metal it earned.
+  function trophyBadge(score) {
+    var metal = C.trophyFor(score);
+    return ' <svg class="badge" data-trophy="' + metal + '" viewBox="0 0 12 16" role="img"'
+      + ' aria-label="' + metal + ' plunger — won the game">'
+      + '<rect x="5" y="1" width="2" height="9" rx="1"/>'
+      + '<path d="M1 15 Q1 9 6 9 Q11 9 11 15 Z"/></svg>';
+  }
+
   function renderTopTable(top) {
     var body = $('top-body');
     if (!top.length) {
@@ -1538,7 +1643,7 @@
       return '<tr' + mine + '>'
         + '<td class="rank">' + (i + 1) + '</td>'
         + '<td class="score">' + esc(fmtNum(r.s)) + '</td>'
-        + '<td>' + esc(r.l) + '</td>'
+        + '<td>' + esc(r.l) + (r.w ? trophyBadge(r.s) : '') + '</td>'
         + '<td class="when">' + esc(fmtDate(r.t)) + '</td>'
         + '</tr>';
     }).join('');
@@ -1810,7 +1915,7 @@
   $('btn-menu').addEventListener('click', toMenu);
   $('btn-next-level').addEventListener('click', function () {
     hide('ov-clear');
-    startLevel(S.level >= C.MAX_LEVEL ? 0 : S.level + 1, true);
+    startLevel(Math.min(C.MAX_LEVEL, S.level + 1), true);
   });
   $('btn-retry').addEventListener('click', function () {
     hide('ov-gameover');
@@ -1819,6 +1924,8 @@
 
   $('btn-scores').addEventListener('click', function () { openScores('ov-menu'); });
   $('btn-go-scores').addEventListener('click', function () { openScores('ov-gameover'); });
+  $('btn-win-scores').addEventListener('click', function () { openScores('ov-win'); });
+  $('btn-win-menu').addEventListener('click', toMenu);
   $('btn-scores-back').addEventListener('click', closeScores);
 
   (function () {

@@ -617,6 +617,21 @@ function lcg(seed) {
     'toCap=' + Math.round(toCap / 1000) + 's');
 }
 
+/* ---------------------------------------------------------------- trophy */
+{
+  check('the game ends at level 50', C.MAX_LEVEL === 50);
+  check('a low score earns bronze', C.trophyFor(0) === 'bronze');
+  check('the tiers step up with the score',
+    C.TROPHIES.every((t, i) => i === 0 || t.from > C.TROPHIES[i - 1].from));
+  check('each tier starts where it says',
+    C.TROPHIES.every((t) => C.trophyFor(t.from) === t.name && (t.from === 0
+      || C.trophyFor(t.from - 1) !== t.name)));
+  check('a full climb from level 0 is at least gold on level bonuses alone',
+    C.trophyFor(Array.from({ length: C.MAX_LEVEL + 1 }, (_, l) => 500 * (l + 1))
+      .reduce((a, b) => a + b, 0)) !== 'bronze'
+    && C.trophyFor(663000) === 'gold');
+}
+
 /* ---------------------------------------------------------------- report */
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');

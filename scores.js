@@ -4,7 +4,8 @@
  * Pure functions over a plain object so they can be unit-tested without a DOM
  * or localStorage (see test/scores.test.js). The caller owns persistence.
  *
- * A run is { s: score, l: level reached, t: epoch ms }.
+ * A run is { s: score, l: level reached, t: epoch ms }, plus w: 1 when the run
+ * flushed the last level and won the game.
  *
  * Two lists are kept rather than one, deliberately: `runs` is a rolling window
  * for the timeline, while `top` is never evicted by age, so a great score from
@@ -28,11 +29,14 @@
   }
 
   function clean(r) {
-    return {
+    var out = {
       s: Math.max(0, Math.round(r.s)),
       l: Math.max(0, Math.round(r.l || 0)),
       t: typeof r.t === 'number' && isFinite(r.t) ? r.t : 0
     };
+    // Only a win is marked, so the stored shape of every other run is unchanged.
+    if (r.w === 1 || r.w === true) out.w = 1;
+    return out;
   }
 
   // Anything may come back out of localStorage: old shapes, partial writes,

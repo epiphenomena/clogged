@@ -276,8 +276,13 @@ C.tryRotate = function (board, piece, dir) { lastRotateDir = dir; return _rotate
 // Catch the board the moment a level is built, so it is accurate before the
 // first piece has even landed.
 const _seed = C.seedLevel;
+// Set to a level number to have that level open with nothing in the pipe, so
+// the top of the game can be reached without playing fifty levels.
+let emptyFrom = Infinity;
 C.seedLevel = function (level, rand) {
-  const built = _seed(level, rand);
+  const built = level >= emptyFrom && !simulating
+    ? { board: C.makeBoardFor(level), pending: [] }
+    : _seed(level, rand);
   if (!simulating) liveBoard = built.board;
   return built;
 };
@@ -404,7 +409,7 @@ function playSmart(maxFrames) {
 
 /* --------------------------------------------------- play and win a level */
 function pick(level) {
-  for (let i = 0; i < 25; i++) el('lv-down').fire('click');
+  for (let i = 0; i < C.MAX_LEVEL + 5; i++) el('lv-down').fire('click');
   for (let i = 0; i < level; i++) el('lv-up').fire('click');
 }
 function startAt(level) {
@@ -1015,6 +1020,72 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   check('starting a new game does not re-record the last one',
     saved().runs.length === beforeReplay,
     beforeReplay + ' -> ' + saved().runs.length);
+}
+
+/* ------------------------------------------------------ winning the game */
+{
+  const saved = () => Sc.sanitize(JSON.parse(store.get('clogged.history') || 'null'));
+  check('the game runs to level 50', C.MAX_LEVEL === 50, 'MAX_LEVEL=' + C.MAX_LEVEL);
+  check('#btn-win-scores is wired', el('btn-win-scores').listeners.has('click'));
+  check('#btn-win-menu is wired', el('btn-win-menu').listeners.has('click'));
+
+  emptyFrom = C.MAX_LEVEL - 1;
+  pick(C.MAX_LEVEL + 10);
+  el('lv-up').fire('click');
+  check('the level picker stops at the last level',
+    el('lv-num').textContent === 'Level ' + C.MAX_LEVEL, el('lv-num').textContent);
+  startAt(C.MAX_LEVEL - 1);
+  const before = saved().runs.length;
+  const slamUntil = (id) => {
+    for (let i = 0; i < 2000 && !visible(id); i++) {
+      global.document.fire('keydown', { key: ' ' });
+      tick(16);
+    }
+  };
+  slamUntil('ov-clear');
+  check('the second-to-last level ends in an ordinary clear', visible('ov-clear'));
+  el('btn-next-level').fire('click');
+  tick(16);
+  check('it leads on to the last level',
+    el('hud-level').textContent === String(C.MAX_LEVEL), el('hud-level').textContent);
+  const beforeWin = Number(el('hud-score').textContent);
+  slamUntil('ov-win');
+  check('flushing the last level wins the game', visible('ov-win'));
+  check('winning is not a level clear', !visible('ov-clear'));
+  for (let i = 0; i < 300; i++) tick(16);
+  check('the game stops on the win screen', visible('ov-win')
+    && el('hud-level').textContent === String(C.MAX_LEVEL), el('hud-level').textContent);
+  const after = saved();
+  check('the win is filed exactly once', after.runs.length === before + 1,
+    before + ' -> ' + after.runs.length);
+  const wonRun = after.runs[after.runs.length - 1];
+  check('the filed run reached the last level and is marked a win',
+    !!wonRun && wonRun.l === C.MAX_LEVEL && wonRun.w === 1, JSON.stringify(wonRun));
+  check('the filed run includes the last level bonus',
+    !!wonRun && wonRun.s >= beforeWin + 500 * (C.MAX_LEVEL + 1), JSON.stringify(wonRun));
+  check('a won game leaves nothing to resume', !store.has('clogged.save'));
+  check('the plunger is cast in the metal the score earned',
+    el('ov-win').getAttribute('data-trophy') === C.trophyFor(wonRun && wonRun.s),
+    el('ov-win').getAttribute('data-trophy'));
+  check('the win screen names the plunger', /plunger$/.test(el('win-metal').textContent),
+    el('win-metal').textContent);
+
+  global.fireWindow('blur');
+  check('losing focus does not pause over the win screen',
+    !visible('ov-pause') && visible('ov-win'));
+
+  el('btn-win-scores').fire('click');
+  check('scores open from the win screen', visible('ov-scores') && !visible('ov-win'));
+  check('the won run carries a plunger in the table',
+    el('top-body').innerHTML.indexOf('class="badge"') > 0);
+  el('btn-scores-back').fire('click');
+  check('closing scores returns to the win screen', visible('ov-win'));
+
+  el('btn-win-menu').fire('click');
+  check('the win screen leads back to the title', visible('ov-menu') && !visible('ov-win'));
+  check('going back to the title does not file the win again',
+    saved().runs.length === before + 1, saved().runs.length);
+  emptyFrom = Infinity;
 }
 
 /* -------------------------------------------------------- score screen UI */

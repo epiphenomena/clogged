@@ -118,6 +118,17 @@ const run = (s, t, l) => ({ s, t: t || 0, l: l || 0 });
   eq('add does not mutate its input', JSON.stringify(before), snapshot);
 }
 
+/* --------------------------------------------------------------- wins */
+{
+  const st = S.add(S.empty(), { s: 700000, l: 50, t: 5, w: 1 });
+  eq('a won run keeps its marker', st.runs[0].w, 1);
+  eq('and so does its place in the top table', st.top[0].w, 1);
+  const plain = S.add(S.empty(), run(100, 3));
+  check('an ordinary run carries no marker', !('w' in plain.runs[0]));
+  const junk = S.sanitize({ runs: [{ s: 10, l: 1, t: 1, w: 'yes' }], top: [] });
+  check('a junk marker is dropped', !('w' in junk.runs[0]));
+}
+
 /* ---------------------------------------------------------------- report */
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');

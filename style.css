@@ -390,3 +390,32 @@ body.fx-active #hud { opacity: 0; pointer-events: none; }
 
 #btn-resume-saved { margin-bottom: 10px; }
 #btn-resume-saved.hidden { display: none; }
+
+/* The prize for flushing the last level: a plunger on a plinth, in a metal set
+   by the final score. game.js carries the same colours for the canvas one. */
+[data-trophy="bronze"] { --t-light: #f6d2a8; --t-main: #c4803f; --t-dark: #6f4118; }
+[data-trophy="silver"] { --t-light: #ffffff; --t-main: #c3cad6; --t-dark: #5f6778; }
+[data-trophy="gold"] { --t-light: #fff3b0; --t-main: #f5c518; --t-dark: #8f6503; }
+[data-trophy="platinum"] { --t-light: #f4fdff; --t-main: #aee3f0; --t-dark: #4d8397; }
+
+.trophy {
+  display: block;
+  width: 120px;
+  height: 176px;
+  margin: 0 auto 10px;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--t-main) 45%, transparent));
+}
+.trophy .t-light { stop-color: var(--t-light); }
+.trophy .t-main { stop-color: var(--t-main); }
+.trophy .t-dark { stop-color: var(--t-dark); }
+.trophy .t-rim { fill: var(--t-dark); }
+.trophy .plinth { fill: #3a2718; stroke: #1d130b; stroke-width: 1.5; }
+.trophy .sparkle { fill: var(--t-light); animation: twinkle 1.6s ease-in-out infinite alternate; }
+
+@keyframes twinkle { from { opacity: 0.25; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .trophy .sparkle { animation: none; } }
+
+#ov-win #win-metal { color: var(--t-main); }
+
+/* A won run in the top table carries a small plunger in its metal. */
+.score-table .badge { width: 9px; height: 12px; vertical-align: -1px; fill: var(--t-main); }

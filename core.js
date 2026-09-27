@@ -31,7 +31,7 @@
 
   var COLORS = 3;
   var MIN_RUN = 4;
-  var MAX_LEVEL = 20;
+  var MAX_LEVEL = 50;   // flushing this one wins the game
   // Pressure is meant to punish stalling, not ordinary play. Nothing happens at
   // all until the grace period is up, and a big level buys more of it, since
   // clearing 40 clogs honestly takes far longer than clearing 4.
@@ -590,7 +590,29 @@
     return scaled * Math.pow(PRESSURE_FACTOR, pressureStep(level, elapsedMs));
   }
 
+  /* ---------------------------------------------------------------- trophy */
+
+  // Flushing the last level wins a golden plunger — or a bronze one, or better
+  // than gold. The metal is set by the final score, so a run that climbed the
+  // whole pipe from level 0 outshines one that started near the top. Level
+  // bonuses alone from 0 to the top come to about 660,000.
+  var TROPHIES = [
+    { from: 0, name: 'bronze' },
+    { from: 150000, name: 'silver' },
+    { from: 500000, name: 'gold' },
+    { from: 1000000, name: 'platinum' }
+  ];
+
+  function trophyFor(score) {
+    var pick = TROPHIES[0];
+    for (var i = 1; i < TROPHIES.length; i++) {
+      if ((score || 0) >= TROPHIES[i].from) pick = TROPHIES[i];
+    }
+    return pick.name;
+  }
+
   return {
+    TROPHIES: TROPHIES, trophyFor: trophyFor,
     BASE_W: BASE_W, BASE_H: BASE_H, MAX_W: MAX_W, MAX_H: MAX_H,
     COLORS: COLORS, MIN_RUN: MIN_RUN, MAX_LEVEL: MAX_LEVEL,
     DIRS: DIRS, OFFSETS: OFFSETS, LINKS: LINKS, OPPOSITE: OPPOSITE,
