@@ -58,9 +58,9 @@ the level it first turns up:
   leaves a plain hairball where it was, which takes a second line to clear.
   One in ten is matted at level 17, rising every level to about three in five
   at level 50.
-- **A fourth colour joins at level 34.** Couplings and clogs both come in lime
-  as well from then on, so lining four up takes more planning. The level
-  picker says how many colours a level uses.
+- **More colours.** A fourth colour, red, joins at level 25, and a fifth,
+  blue, at level 38. Couplings and clogs both use them, so four of a kind
+  takes more planning. The level picker says how many colours a level uses.
 
 Chains multiply your score: each cascade step in a single landing doubles the
 multiplier, up to 16×.
@@ -148,8 +148,11 @@ Anything still blocked after that is refused and the coupling keeps its current
 orientation. In a one-wide well — no room either side at its own row or the row
 above — it simply stays lying down.
 
-Each colour also carries a shape — ring, bar, cross, and from level 34 a
-triangle — so the game is playable without relying on colour vision.
+Pieces carry no marks, only their colour — at the size of the fittings on the
+big pipe, shapes were too small to read. So the five colours are chosen to
+stay far apart: teal, amber, magenta, red and blue are all at least ΔE2000 ~31
+from one another, and still ~13 apart under simulated red-green and blue-yellow
+colour blindness.
 
 ## Picking up where you left off
 

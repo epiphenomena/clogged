@@ -29,8 +29,13 @@
     { light: '#9ff6ea', main: '#2dd4bf', dark: '#12897c', deep: '#084a44', rgb: '45,212,191' },
     { light: '#ffdf9a', main: '#f59e0b', dark: '#a96a06', deep: '#5f3a03', rgb: '245,158,11' },
     { light: '#f9c7ff', main: '#e879f9', dark: '#a132ba', deep: '#5c1a6b', rgb: '232,121,249' },
-    // joins from level 34 (Core.FOURTH_FROM)
-    { light: '#e4fbb0', main: '#a3e635', dark: '#5f8a12', deep: '#2f4708', rgb: '163,230,53' }
+    // The fourth and fifth join later (Core.FOURTH_FROM, Core.FIFTH_FROM).
+    // Colour is the only cue a piece carries, so these were picked for
+    // distance from each other: the closest pair of all five is ΔE2000 ~31
+    // for normal vision, and still ~13 under simulated deuteranopia,
+    // protanopia and tritanopia.
+    { light: '#fca5a5', main: '#dc2626', dark: '#991b1b', deep: '#450a0a', rgb: '220,38,38' },
+    { light: '#93c5fd', main: '#2563eb', dark: '#1e40af', deep: '#172554', rgb: '37,99,235' }
   ];
 
   // The trophy's metal, by tier (see Core.trophyFor). style.css carries the
@@ -393,32 +398,6 @@
     return g;
   }
 
-  // A shape cue per colour, so the game works without colour vision. The
-  // hairball core is dark and low-contrast, so this matters more, not less.
-  function glyph(ctx, cx, cy, s, color, alpha) {
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,' + (alpha || 0.62) + ')';
-    ctx.lineWidth = Math.max(1.2, s * 0.075);
-    ctx.lineCap = 'round';
-    var g = s * 0.16;
-    ctx.beginPath();
-    if (color === 0) {
-      ctx.arc(cx, cy, g, 0, Math.PI * 2);
-    } else if (color === 1) {
-      ctx.moveTo(cx - g, cy); ctx.lineTo(cx + g, cy);
-    } else if (color === 3) {
-      ctx.moveTo(cx, cy - g * 1.1);
-      ctx.lineTo(cx + g, cy + g * 0.75);
-      ctx.lineTo(cx - g, cy + g * 0.75);
-      ctx.closePath();
-    } else {
-      ctx.moveTo(cx - g, cy - g); ctx.lineTo(cx + g, cy + g);
-      ctx.moveTo(cx + g, cy - g); ctx.lineTo(cx - g, cy + g);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
   // Tube shading: dark rim, bright sheen line, body, deep shadow.
   function pipeBody(ctx, x, y, w, h, color, horizontal, radii) {
     var P = PALETTE[color];
@@ -507,8 +486,6 @@
       ctx.arc(x + s / 2, y + s / 2, Math.max(1, s * 0.045), 0, Math.PI * 2);
       ctx.fill();
     }
-
-    glyph(ctx, x + s / 2, y + s / 2, s, color, 0.6);
   }
 
   // A hairball: a matted core buried in a thick tangle of strands. This is only
@@ -599,15 +576,11 @@
     }
     ctx.restore();
     ctx.restore();
-
-    glyph(ctx, cx, cy, s, color, 0.8);
   }
 
   // The mat on a matted clog, drawn over the plain hairball: two braided
-  // collars of strands wound tight round it. That hard double ring changes the
-  // clog's outline, not just its colour, so it reads without colour vision; the
-  // glyph is redrawn on top so the mat never hides which shape it is. The first
-  // flush strips this off.
+  // collars of strands wound tight round it, a hard double ring that changes
+  // the clog's outline. The first flush strips this off.
   function drawMat(ctx, x, y, s, color) {
     var P = PALETTE[color];
     var cx = x + s / 2, cy = y + s / 2;
@@ -626,7 +599,6 @@
       }
     }
     ctx.restore();
-    glyph(ctx, cx, cy, s, color, 0.9);
   }
 
   /* ------------------------------------------------------------- sprites */
@@ -1216,7 +1188,8 @@
   // The level where something new turns up says so as it opens.
   function announce(level) {
     if (level === C.MATTED_FROM) toast('MATTED CLOGS', '#ffdf9a');
-    else if (level === C.FOURTH_FROM) toast('A FOURTH COLOUR', '#e4fbb0');
+    else if (level === C.FOURTH_FROM) toast('A FOURTH COLOUR', PALETTE[3].light);
+    else if (level === C.FIFTH_FROM) toast('A FIFTH COLOUR', PALETTE[4].light);
   }
 
   function spawn() {

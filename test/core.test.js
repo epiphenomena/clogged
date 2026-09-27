@@ -660,25 +660,30 @@ function lcg(seed) {
     'matted=' + late);
 }
 
-/* ------------------------------------------------------- a fourth colour */
+/* ---------------------------------------------- a fourth and fifth colour */
 {
-  eq('three colours before level 34', C.colorsFor(C.FOURTH_FROM - 1), 3);
-  eq('four from level 34', C.colorsFor(C.FOURTH_FROM), 4);
-  eq('and four at the top', C.colorsFor(C.MAX_LEVEL), 4);
+  eq('three colours before the fourth arrives', C.colorsFor(C.FOURTH_FROM - 1), 3);
+  eq('four from its level', C.colorsFor(C.FOURTH_FROM), 4);
+  eq('still four just before the fifth', C.colorsFor(C.FIFTH_FROM - 1), 4);
+  eq('five from the fifth colour\'s level', C.colorsFor(C.FIFTH_FROM), 5);
+  eq('and five at the top', C.colorsFor(C.MAX_LEVEL), 5);
+  check('the fourth arrives before the fifth, both inside the game',
+    C.FOURTH_FROM < C.FIFTH_FROM && C.FIFTH_FROM <= C.MAX_LEVEL);
   check('a snapshot can hold every colour in play', C.COLORS >= C.colorsFor(C.MAX_LEVEL));
-  const { board: b, pending } = C.seedLevel(C.FOURTH_FROM, lcg(5));
-  const seen = new Set(pending);
-  b.forEach((x) => { if (x) seen.add(x.color); });
-  eq('a four-colour level deals clogs in all four', seen.size, 4);
-  const early = new Set();
-  const r3 = lcg(8), r4 = lcg(8);
-  const late = new Set();
-  for (let i = 0; i < 200; i++) {
+  for (const level of [C.FOURTH_FROM, C.FIFTH_FROM]) {
+    const { board: b, pending } = C.seedLevel(level, lcg(5));
+    const seen = new Set(pending);
+    b.forEach((x) => { if (x) seen.add(x.color); });
+    eq('level ' + level + ' deals clogs in every colour it uses', seen.size, C.colorsFor(level));
+  }
+  const r3 = lcg(8), r5 = lcg(8);
+  const early = new Set(), late = new Set();
+  for (let i = 0; i < 300; i++) {
     C.randomColors(r3).forEach((c) => early.add(c));
-    C.randomColors(r4, 4).forEach((c) => late.add(c));
+    C.randomColors(r5, 5).forEach((c) => late.add(c));
   }
   eq('couplings default to three colours', early.size, 3);
-  eq('and use four when asked', late.size, 4);
+  eq('and use five when asked', late.size, 5);
 }
 
 /* ---------------------------------------------------------------- trophy */

@@ -1051,7 +1051,7 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   const coloursDealtAt = (level) => {
     const seen = new Set();
     startAt(level);
-    for (let i = 0; i < 4000 && seen.size < 4 && !visible('ov-gameover') && !visible('ov-clear'); i++) {
+    for (let i = 0; i < 4000 && seen.size < 5 && !visible('ov-gameover') && !visible('ov-clear'); i++) {
       if (pendingSpawn) { pendingSpawn = false; liveColors.forEach((c) => seen.add(c)); }
       if (i % 4 === 0) global.document.fire('keydown', { key: ' ' });
       tick(16);
@@ -1063,12 +1063,15 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   };
   const before = coloursDealtAt(C.FOURTH_FROM - 1);
   check('couplings come in three colours before the fourth arrives',
-    !before.has(3) && before.size === 3, [...before].join(','));
-  const after = coloursDealtAt(C.FOURTH_FROM);
-  check('couplings come in the fourth colour from its level', after.has(3), [...after].join(','));
-  pick(C.FOURTH_FROM);
+    Math.max(...before) === 2 && before.size === 3, [...before].join(','));
+  const fourth = coloursDealtAt(C.FOURTH_FROM);
+  check('couplings come in the fourth colour from its level',
+    fourth.has(3) && !fourth.has(4), [...fourth].join(','));
+  const fifth = coloursDealtAt(C.FIFTH_FROM);
+  check('couplings come in the fifth colour from its level', fifth.has(4), [...fifth].join(','));
+  pick(C.FIFTH_FROM);
   check('the level picker says how many colours a level uses',
-    / 4 colours$/.test(el('lv-clogs').textContent), el('lv-clogs').textContent);
+    / 5 colours$/.test(el('lv-clogs').textContent), el('lv-clogs').textContent);
 }
 
 /* ------------------------------------------------------ winning the game */

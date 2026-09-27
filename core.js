@@ -31,11 +31,12 @@
   var MAX_W = 12;
   var MAX_H = 24;
 
-  // Three colours until level 34, when a fourth joins them. COLORS is the most
-  // any level uses, which is what a snapshot may hold.
+  // Three colours until level 25, a fourth from there, and a fifth from 38.
+  // COLORS is the most any level uses, which is what a snapshot may hold.
   var BASE_COLORS = 3;
-  var COLORS = 4;
-  var FOURTH_FROM = 34;
+  var COLORS = 5;
+  var FOURTH_FROM = 25;
+  var FIFTH_FROM = 38;
   var MIN_RUN = 4;
   var MAX_LEVEL = 50;   // flushing this one wins the game
   // Pressure is meant to punish stalling, not ordinary play. Nothing happens at
@@ -366,7 +367,8 @@
   }
 
   function colorsFor(level) {
-    return (level || 0) >= FOURTH_FROM ? COLORS : BASE_COLORS;
+    var l = level || 0;
+    return l >= FIFTH_FROM ? 5 : l >= FOURTH_FROM ? 4 : BASE_COLORS;
   }
 
   function randomColors(rand, colors) {
@@ -664,7 +666,7 @@
   return {
     TROPHIES: TROPHIES, trophyFor: trophyFor,
     BASE_W: BASE_W, BASE_H: BASE_H, MAX_W: MAX_W, MAX_H: MAX_H,
-    COLORS: COLORS, BASE_COLORS: BASE_COLORS, FOURTH_FROM: FOURTH_FROM, colorsFor: colorsFor,
+    COLORS: COLORS, BASE_COLORS: BASE_COLORS, FOURTH_FROM: FOURTH_FROM, FIFTH_FROM: FIFTH_FROM, colorsFor: colorsFor,
     MIN_RUN: MIN_RUN, MAX_LEVEL: MAX_LEVEL,
     DIRS: DIRS, OFFSETS: OFFSETS, LINKS: LINKS, OPPOSITE: OPPOSITE,
     dimsFor: dimsFor, dims: dims,
