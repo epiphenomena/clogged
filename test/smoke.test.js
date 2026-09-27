@@ -294,16 +294,8 @@ C.clearMatches = function (board, hits) {
   if (!simulating) strippedTotal += got.stripped || 0;
   return got;
 };
-// Arrivals landed since the last coupling spawned, and the most seen at once.
-let arrivalsInRow = 0, mostArrivalsInRow = 0;
-const _placeClog = C.placeClog;
-C.placeClog = function (...args) {
-  if (!simulating) mostArrivalsInRow = Math.max(mostArrivalsInRow, ++arrivalsInRow);
-  return _placeClog.apply(this, args);
-};
 const _spawn = C.spawnPiece;
 C.spawnPiece = function (board, colors) {
-  arrivalsInRow = 0;
   pendingSpawn = true;
   liveColors = colors.slice();
   return _spawn(board, colors);
@@ -1052,23 +1044,6 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   if (visible('ov-gameover')) el('btn-menu').fire('click');
   else if (visible('ov-clear')) { el('btn-next-level').fire('click'); el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
   else { el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
-}
-
-/* ---------------------------------------------------------- burst arrivals */
-{
-  const arrivalsAt = (level) => {
-    startAt(level);
-    mostArrivalsInRow = 0;
-    playSmart(12000);
-    if (visible('ov-gameover')) el('btn-menu').fire('click');
-    else if (visible('ov-clear')) { el('btn-next-level').fire('click'); el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
-    else { el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
-    return mostArrivalsInRow;
-  };
-  const early = arrivalsAt(C.BURST_FROM - 1);
-  check('before bursts, clogs arrive one between couplings', early === 1, 'most=' + early);
-  const late = arrivalsAt(C.MAX_LEVEL);
-  check('late on, clogs can arrive two at a time', late === 2, 'most=' + late);
 }
 
 /* ---------------------------------------------------------- fourth colour */

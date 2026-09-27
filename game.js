@@ -172,7 +172,6 @@
     settleTimer: 0,
     pending: [],          // clogs still to wash down this level
     sinceDrip: 0,         // couplings landed since the last arrival
-    dripBurst: 0,         // clogs still to follow the one just arrived
     drip: null,           // {col, color, row, target} while one is falling
     levelElapsed: 0,      // drives the pressure ramp
     pressure: 0,
@@ -1196,7 +1195,6 @@
     S.pending = built.pending;
     layout();      // the pipe may be a different size at this level
     S.sinceDrip = 0;
-    S.dripBurst = 0;
     S.drip = null;
     if (!keepScore) S.score = 0;
     S.chain = 0;
@@ -1218,7 +1216,6 @@
   // The level where something new turns up says so as it opens.
   function announce(level) {
     if (level === C.MATTED_FROM) toast('MATTED CLOGS', '#ffdf9a');
-    else if (level === C.BURST_FROM) toast('CLOGS IN PAIRS', '#ffdf9a');
     else if (level === C.FOURTH_FROM) toast('A FOURTH COLOUR', '#e4fbb0');
   }
 
@@ -1304,15 +1301,12 @@
 
   function clogsLeft() { return C.countClogs(S.board) + S.pending.length; }
 
-  // Sends the next queued clog washing down a column of its own choosing. A
-  // fresh arrival decides whether another follows straight behind it.
-  function startDrip(follow) {
+  // Sends the next queued clog washing down a column of its own choosing.
+  function startDrip() {
     var col = C.dripColumn(S.board, Math.random);
     var target = col < 0 ? -1 : C.dripTarget(S.board, col, Math.random);
     S.sinceDrip = 0;
-    if (follow) S.dripBurst--;
-    else S.dripBurst = C.rollBurst(S.level, Math.random) ? 1 : 0;
-    if (target < 0) { S.dripBurst = 0; return false; }   // nowhere to go; try later
+    if (target < 0) return false;   // nowhere for it to go; try again later
     S.drip = {
       col: col, color: S.pending.shift(), row: -1, target: target,
       matted: C.rollMatted(S.level, Math.random)
@@ -1324,9 +1318,7 @@
   function afterSettle() {
     var hits = C.findMatches(S.board);
     if (hits.size) { beginClear(hits); return; }
-    if (S.pending.length && S.dripBurst > 0 && startDrip(true)) return;
-    S.dripBurst = 0;
-    if (S.pending.length && S.sinceDrip >= C.dripEvery(S.level) && startDrip(false)) return;
+    if (S.pending.length && S.sinceDrip >= C.dripEvery(S.level) && startDrip()) return;
     if (clogsLeft() === 0) { levelCleared(); return; }
     spawn();
   }
@@ -1904,7 +1896,6 @@
     S.nextColors = saved.next;
     S.pending = saved.pending;
     S.sinceDrip = saved.sinceDrip;
-    S.dripBurst = 0;
     S.levelElapsed = saved.elapsed;
     S.pressure = saved.pressure;
     S.locks = saved.locks;

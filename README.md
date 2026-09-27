@@ -49,7 +49,7 @@ A few details make or break a plan:
   and a half minutes of stalling. It punishes dithering, not ordinary play.
 
 Past level 16 the pipe has stopped growing and the speed is near its cap, so
-three things keep the difficulty climbing to the top — each one announced on
+two things keep the difficulty climbing to the top — each one announced on
 the level it first turns up:
 
 - **Some clogs are matted.** From level 17 a share of the hairballs — arrivals
@@ -58,9 +58,6 @@ the level it first turns up:
   leaves a plain hairball where it was, which takes a second line to clear.
   One in ten is matted at level 17, rising every level to about three in five
   at level 50.
-- **Arrivals come in bursts.** From level 25 a clog can wash down with a
-  second one straight behind it, before your next coupling. The chance starts
-  at about one in seven and climbs every level to four in five at level 50.
 - **A fourth colour joins at level 34.** Couplings and clogs both come in lime
   as well from then on, so lining four up takes more planning. The level
   picker says how many colours a level uses.

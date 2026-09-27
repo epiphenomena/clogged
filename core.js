@@ -426,25 +426,6 @@
     return Math.max(2, 4 - Math.floor(level / 8));
   }
 
-  // From level 25 an arrival may bring a second clog straight down behind it,
-  // before the next coupling. The chance climbs every level, to four in five
-  // at the top. Arrivals still wait for couplings in between, as dripEvery
-  // says; a burst only makes each one heavier.
-  var BURST_FROM = 25;
-  var BURST_BASE = 0.15;
-  var BURST_PER_LEVEL = 0.03;
-  var BURST_MAX = 0.8;
-
-  function burstChance(level) {
-    if ((level || 0) < BURST_FROM) return 0;
-    return Math.min(BURST_MAX, BURST_BASE + (level - BURST_FROM) * BURST_PER_LEVEL);
-  }
-
-  function rollBurst(level, rand) {
-    var chance = burstChance(level);
-    return chance > 0 && (rand || Math.random)() < chance;
-  }
-
   function shuffle(list, rand) {
     for (var i = list.length - 1; i > 0; i--) {
       var j = (rand() * (i + 1)) | 0;
@@ -699,7 +680,6 @@
     clogSeedCount: clogSeedCount, dripEvery: dripEvery, balancedColors: balancedColors,
     dripLanding: dripLanding, dripColumn: dripColumn, placeClog: placeClog,
     dripTarget: dripTarget,
-    burstChance: burstChance, rollBurst: rollBurst, BURST_FROM: BURST_FROM,
     mattedShare: mattedShare, rollMatted: rollMatted, MATTED_FROM: MATTED_FROM, dripSnagRows: dripSnagRows, snagMinRow: snagMinRow,
     DRIP_SNAG_CHANCE: DRIP_SNAG_CHANCE,
     shuffle: shuffle,
