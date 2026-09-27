@@ -660,6 +660,22 @@ function lcg(seed) {
     'matted=' + late);
 }
 
+/* ------------------------------------------------------------ bursts */
+{
+  eq('arrivals come singly before level 25', C.burstChance(C.BURST_FROM - 1), 0);
+  check('they can come in pairs from level 25', C.burstChance(C.BURST_FROM) > 0);
+  check('the chance of a pair climbs every level until it tops out',
+    Array.from({ length: C.MAX_LEVEL - C.BURST_FROM }, (_, i) =>
+      C.burstChance(C.BURST_FROM + i + 1) >= C.burstChance(C.BURST_FROM + i)).every(Boolean)
+    && C.burstChance(C.BURST_FROM + 5) > C.burstChance(C.BURST_FROM));
+  check('not every arrival is a pair, even at the top', C.burstChance(C.MAX_LEVEL) < 1);
+  const rand = lcg(3);
+  let pairs = 0;
+  for (let i = 0; i < 1000; i++) if (C.rollBurst(C.MAX_LEVEL, rand)) pairs++;
+  check('the top level pairs most arrivals', pairs > 600 && pairs < 950, 'pairs=' + pairs);
+  check('an early level never rolls a pair', !C.rollBurst(10, () => 0));
+}
+
 /* ---------------------------------------------------------------- trophy */
 {
   check('the game ends at level 50', C.MAX_LEVEL === 50);

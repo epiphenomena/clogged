@@ -43,6 +43,9 @@ A few details make or break a plan:
   proportionally faster so one still crosses the screen in about the same time.
   The level picker on the title screen names the pipe you are about to play in,
   and shows it behind the menu.
+- **Arrivals come in bursts.** From level 25 a clog can wash down with a
+  second one straight behind it, before your next coupling. The chance starts
+  at about one in seven and climbs every level to four in five at level 50.
 - **Some clogs are matted.** From level 17 a share of the hairballs — arrivals
   included — come bound in a braided collar with two bands lashed across them.
   A line through one only strips the mat off (for half a clog's points) and
