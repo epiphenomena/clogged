@@ -64,6 +64,7 @@ the level it first turns up:
 - **A fourth colour joins at level 34.** Couplings and clogs both come in lime
   as well from then on, so lining four up takes more planning. The level
   picker says how many colours a level uses.
+
 Chains multiply your score: each cascade step in a single landing doubles the
 multiplier, up to 16×.
 
