@@ -617,6 +617,49 @@ function lcg(seed) {
     'toCap=' + Math.round(toCap / 1000) + 's');
 }
 
+/* -------------------------------------------------------- matted clogs */
+{
+  const matted = (color) => ({ color, type: 'clog', link: null, matted: true });
+  const b = C.makeBoard();
+  put(b, 0, 15, matted(1));
+  for (let c = 1; c < 4; c++) put(b, c, 15, seg(1));
+  const got = C.clearMatches(b, C.findMatches(b));
+  eq('a flush strips a matted clog rather than clearing it', got.stripped, 1);
+  eq('stripping is not counted as clearing', got.clogs, 0);
+  check('the stripped clog stays where it was', !!at(b, 0, 15) && at(b, 0, 15).type === 'clog');
+  check('and has lost its mat', !at(b, 0, 15).matted);
+  eq('the rest of the line is gone', at(b, 1, 15), null);
+  for (let c = 1; c < 4; c++) put(b, c, 15, seg(1));
+  const again = C.resolve(b);
+  eq('a second line clears it for good', again.clogs, 1);
+  eq('leaving nothing behind', at(b, 0, 15), null);
+
+  const copy = C.cloneBoard(Object.assign(C.makeBoard(), {}));
+  const src = C.makeBoard();
+  put(src, 2, 15, matted(0));
+  check('a copied board keeps its mats', C.cloneBoard(src)[C.idx(src, 2, 15)].matted === true);
+  check('a placed arrival can be matted',
+    C.placeClog(copy, 1, 15, 2, true) && at(copy, 1, 15).matted === true);
+  check('and by default is not', C.placeClog(copy, 2, 15, 2) && !at(copy, 2, 15).matted);
+
+  eq('no clog is matted before level 17', C.mattedShare(C.MATTED_FROM - 1), 0);
+  check('some are from level 17', C.mattedShare(C.MATTED_FROM) > 0);
+  check('the share grows every level after',
+    Array.from({ length: C.MAX_LEVEL - C.MATTED_FROM }, (_, i) =>
+      C.mattedShare(C.MATTED_FROM + i + 1) > C.mattedShare(C.MATTED_FROM + i)).every(Boolean));
+  check('but never mats every clog', C.mattedShare(C.MAX_LEVEL) < 0.75,
+    'share=' + C.mattedShare(C.MAX_LEVEL));
+
+  let early = 0, late = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    early += C.seedLevel(16, lcg(seed)).board.filter((x) => x && x.matted).length;
+    late += C.seedLevel(C.MAX_LEVEL, lcg(seed)).board.filter((x) => x && x.matted).length;
+  }
+  eq('a level before 17 seeds no mats', early, 0);
+  check('the top level seeds plenty', late > 20 * C.clogSeedCount(C.MAX_LEVEL) * 0.3,
+    'matted=' + late);
+}
+
 /* ---------------------------------------------------------------- trophy */
 {
   check('the game ends at level 50', C.MAX_LEVEL === 50);

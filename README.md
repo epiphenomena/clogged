@@ -43,6 +43,12 @@ A few details make or break a plan:
   proportionally faster so one still crosses the screen in about the same time.
   The level picker on the title screen names the pipe you are about to play in,
   and shows it behind the menu.
+- **Some clogs are matted.** From level 17 a share of the hairballs — arrivals
+  included — come bound in a braided collar with two bands lashed across them.
+  A line through one only strips the mat off (for half a clog's points) and
+  leaves a plain hairball where it was, which takes a second line to clear.
+  One in ten is matted at level 17, rising every level to about three in five
+  at level 50.
 - **Pressure builds, eventually.** Nothing changes for the first minute — longer
   on a big level, which honestly takes longer to clear. After that the couplings
   speed up a few percent every 30 seconds, topping out around 1.7× after five

@@ -38,7 +38,10 @@
       w: game.board.w,
       h: game.board.h,
       board: game.board.map(function (cell) {
-        return cell ? [cell.color, cell.type === 'clog' ? 1 : 0, cell.link || 0] : 0;
+        // 0 segment, 1 clog, 2 matted clog. Builds before matting never
+        // wrote a 2, so their snapshots still read back unchanged.
+        return cell ? [cell.color, cell.type !== 'clog' ? 0 : cell.matted ? 2 : 1,
+          cell.link || 0] : 0;
       }),
       piece: game.piece
         ? [game.piece.c, game.piece.r, game.piece.orient,
@@ -78,15 +81,19 @@
       if (slot === 0 || slot === null) { board.push(null); continue; }
       if (!Array.isArray(slot) || slot.length !== 3) return null;
       if (!isInt(slot[0], 0, colors - 1)) return null;
-      if (slot[1] !== 0 && slot[1] !== 1) return null;
+      if (slot[1] !== 0 && slot[1] !== 1 && slot[1] !== 2) return null;
       var link = slot[2];
       if (link !== 0 && !LINKS[link]) return null;
-      if (slot[1] === 1) clogs++;
-      board.push({
+      // Clogs are never half of a coupling.
+      if (slot[1] !== 0 && link !== 0) return null;
+      var cell = {
         color: slot[0],
-        type: slot[1] === 1 ? 'clog' : 'segment',
+        type: slot[1] === 0 ? 'segment' : 'clog',
         link: link === 0 ? null : link
-      });
+      };
+      if (slot[1] === 2) cell.matted = true;
+      if (slot[1] !== 0) clogs++;
+      board.push(cell);
     }
 
     var piece = null;

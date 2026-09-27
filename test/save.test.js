@@ -117,6 +117,23 @@ function sampleGame() {
   eq('a pipe wider than the game can build is refused', S.decode(huge, LIMITS), null);
 }
 
+// Matted clogs keep their mat through a save, and plain ones do not gain one.
+{
+  const g = sampleGame();
+  g.board[C.idx(g.board, 6, 15)] = { color: 0, type: 'clog', link: null, matted: true };
+  const back = S.decode(S.encode(g), LIMITS);
+  check('a board with a matted clog decodes', !!back);
+  eq('the mat survives', back && back.board[C.idx(back.board, 6, 15)].matted, true);
+  eq('a matted clog is still a clog', back && back.board[C.idx(back.board, 6, 15)].type, 'clog');
+  check('a plain clog stays plain', back && !back.board[C.idx(back.board, 2, 14)].matted);
+  const raw = S.encode(g);
+  raw.board[C.idx(g.board, 6, 15)] = [0, 3, 0];
+  eq('an unknown kind of cell is refused', S.decode(raw, LIMITS), null);
+  const linked = S.encode(g);
+  linked.board[C.idx(g.board, 6, 15)] = [0, 2, 'left'];
+  eq('a clog claiming to be half a coupling is refused', S.decode(linked, LIMITS), null);
+}
+
 /* ------------------------------------------------- refusing bad records */
 {
   const good = S.encode(sampleGame());

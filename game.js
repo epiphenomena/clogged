@@ -596,13 +596,50 @@
     glyph(ctx, cx, cy, s, color, 0.8);
   }
 
+  // The mat on a matted clog, drawn over the plain hairball: a braided collar of
+  // strands wound round it and two bands lashed across its face. The bands give
+  // it a different outline, not just a different colour, so it reads without
+  // colour vision too. The first flush strips this off.
+  function drawMat(ctx, x, y, s, color) {
+    var P = PALETTE[color];
+    var cx = x + s / 2, cy = y + s / 2;
+    var R = s * 0.36;
+    ctx.save();
+    ctx.lineCap = 'round';
+
+    // braided collar: short overlapping arcs, alternating dark and pale
+    for (var k = 0; k < 18; k++) {
+      var a0 = (k / 18) * Math.PI * 2;
+      ctx.strokeStyle = k % 2 ? P.deep : P.light;
+      ctx.globalAlpha = k % 2 ? 0.95 : 0.75;
+      ctx.lineWidth = Math.max(1.2, s * 0.07);
+      ctx.beginPath();
+      ctx.arc(cx, cy, R + (k % 2 ? 0 : s * 0.02), a0, a0 + Math.PI / 7);
+      ctx.stroke();
+    }
+
+    // two bands lashed across, like twine round a parcel
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = '#1a1220';
+    ctx.lineWidth = Math.max(1.6, s * 0.1);
+    ctx.beginPath();
+    ctx.moveTo(cx - R * 0.8, cy - R * 0.55); ctx.lineTo(cx + R * 0.8, cy + R * 0.55);
+    ctx.moveTo(cx + R * 0.8, cy - R * 0.55); ctx.lineTo(cx - R * 0.8, cy + R * 0.55);
+    ctx.stroke();
+    ctx.strokeStyle = P.light;
+    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = Math.max(0.8, s * 0.035);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   /* ------------------------------------------------------------- sprites */
 
   // Every cell is one of a small fixed set of pictures, so they are drawn once
   // per layout and blitted thereafter. Hairballs get several variants so a
   // field of them does not look stamped.
   var CLOG_VARIANTS = 5;
-  var sprites = { seg: null, clog: null };
+  var sprites = { seg: null, clog: null, mat: null };
 
   function spriteCanvas(cell, dpr, paint) {
     var c = document.createElement('canvas');
@@ -618,6 +655,7 @@
     var links = ['left', 'right', 'up', 'down', 'none'];
     sprites.seg = [];
     sprites.clog = [];
+    sprites.mat = [];
     for (var color = 0; color < PALETTE.length; color++) {
       var byLink = {};
       for (var l = 0; l < links.length; l++) {
@@ -638,6 +676,9 @@
         })(v + 1);
       }
       sprites.clog.push(variants);
+      sprites.mat.push(spriteCanvas(cell, dpr, function (g) {
+        drawMat(g, 0, 0, cell, color);
+      }));
     }
   }
 
@@ -647,6 +688,10 @@
 
   function clogSprite(color, i) {
     return sprites.clog ? sprites.clog[color][i % CLOG_VARIANTS] : null;
+  }
+
+  function matSprite(color) {
+    return sprites.mat ? sprites.mat[color] : null;
   }
 
   function blit(ctx, sprite, x, y, s) {
@@ -686,6 +731,20 @@
 
       if (!clearing || !clearing.has(i)) {
         blit(ctx, sprite, x, y, s);
+        if (cell.matted) blit(ctx, matSprite(cell.color), x, y, s);
+        continue;
+      }
+
+      // A matted clog survives its flush: only the mat bursts off it.
+      if (cell.matted) {
+        blit(ctx, sprite, x, y, s);
+        ctx.save();
+        ctx.globalAlpha = 1 - p;
+        var km = 1 + p * 0.45;
+        ctx.translate(x + s / 2, y + s / 2);
+        ctx.scale(km, km);
+        blit(ctx, matSprite(cell.color), -s / 2, -s / 2, s);
+        ctx.restore();
         continue;
       }
 
@@ -774,6 +833,7 @@
     ctx.restore();
 
     blit(ctx, clogSprite(d.color, d.col + d.target), view.x0 + d.col * sz, y, sz);
+    if (d.matted) blit(ctx, matSprite(d.color), view.x0 + d.col * sz, y, sz);
   }
 
   function drawToast() {
@@ -1213,15 +1273,17 @@
 
   function beginClear(hits) {
     S.chain++;
-    var clogs = 0, segments = 0;
+    var clogs = 0, segments = 0, stripped = 0;
     hits.forEach(function (i) {
       var cell = S.board[i];
       if (!cell) return;
-      if (cell.type === 'clog') clogs++; else segments++;
+      if (cell.matted) stripped++;
+      else if (cell.type === 'clog') clogs++;
+      else segments++;
     });
 
     var mult = Math.min(Math.pow(2, S.chain - 1), 16);
-    var gained = Math.round((clogs * 100 + segments * 10) * mult);
+    var gained = Math.round((clogs * 100 + stripped * 50 + segments * 10) * mult);
     S.score += gained;
 
     toast((S.chain > 1 ? 'CHAIN x' + S.chain + '  ' : '') + '+' + gained,
@@ -1242,7 +1304,10 @@
     var target = col < 0 ? -1 : C.dripTarget(S.board, col, Math.random);
     S.sinceDrip = 0;
     if (target < 0) return false;   // nowhere for it to go; try again later
-    S.drip = { col: col, color: S.pending.shift(), row: -1, target: target };
+    S.drip = {
+      col: col, color: S.pending.shift(), row: -1, target: target,
+      matted: C.rollMatted(S.level, Math.random)
+    };
     S.phase = 'dripping';
     return true;
   }
@@ -1329,7 +1394,7 @@
     } else if (S.phase === 'dripping') {
       S.drip.row += dt / (DRIP_MS * C.BASE_H / rows());
       if (S.drip.row >= S.drip.target) {
-        C.placeClog(S.board, S.drip.col, S.drip.target, S.drip.color);
+        C.placeClog(S.board, S.drip.col, S.drip.target, S.drip.color, S.drip.matted);
         S.drip = null;
         S.shake = 2;
         Sound.drip();

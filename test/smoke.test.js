@@ -286,6 +286,14 @@ C.seedLevel = function (level, rand) {
   if (!simulating) liveBoard = built.board;
   return built;
 };
+// Counts mats stripped by the game's own flushes.
+let strippedTotal = 0;
+const _clearMatches = C.clearMatches;
+C.clearMatches = function (board, hits) {
+  const got = _clearMatches(board, hits);
+  if (!simulating) strippedTotal += got.stripped || 0;
+  return got;
+};
 const _spawn = C.spawnPiece;
 C.spawnPiece = function (board, colors) {
   pendingSpawn = true;
@@ -1020,6 +1028,22 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   check('starting a new game does not re-record the last one',
     saved().runs.length === beforeReplay,
     beforeReplay + ' -> ' + saved().runs.length);
+}
+
+/* ------------------------------------------------------------ matted clogs */
+{
+  startAt(40);
+  const mats = () => liveBoard.filter((x) => x && x.matted).length;
+  check('a late level opens with matted clogs', mats() > 0, 'matted=' + mats());
+  strippedTotal = 0;
+  const r = playSmart(20000);
+  check('a level with matted clogs plays without getting stuck',
+    r.cleared || r.over || !visible('ov-pause'), JSON.stringify(r));
+  check('flushes strip mats as the level is played', strippedTotal > 0,
+    'stripped=' + strippedTotal + ' ' + JSON.stringify(r));
+  if (visible('ov-gameover')) el('btn-menu').fire('click');
+  else if (visible('ov-clear')) { el('btn-next-level').fire('click'); el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
+  else { el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
 }
 
 /* ------------------------------------------------------ winning the game */

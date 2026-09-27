@@ -7,6 +7,8 @@
  * pipe is a different size at different levels. Each slot is null or:
  *   { color: 0|1|2, type: 'clog'|'segment', link: 'left'|'right'|'up'|'down'|null }
  * `link` points at the other half of a coupler. Clogs never move; segments fall.
+ * A clog may also be `matted: true` — wound so tight that the first flush only
+ * strips the mat off, and it takes a second to clear it.
  * When one half of a coupler is dissolved the survivor's link is cleared, which
  * turns it into a free single that falls on its own.
  */
@@ -76,6 +78,12 @@
     return makeBoard(d.w, d.h);
   }
 
+  function copyCell(cell) {
+    var out = { color: cell.color, type: cell.type, link: cell.link };
+    if (cell.matted) out.matted = true;
+    return out;
+  }
+
   // A copy that keeps its geometry, for callers that want to try something out
   // on a throwaway board.
   function cloneBoard(board) {
@@ -83,7 +91,7 @@
     var out = makeBoard(d.w, d.h);
     for (var i = 0; i < board.length; i++) {
       var cell = board[i];
-      out[i] = cell ? { color: cell.color, type: cell.type, link: cell.link } : null;
+      out[i] = cell ? copyCell(cell) : null;
     }
     return out;
   }
@@ -149,12 +157,16 @@
   }
 
   // Removes every hit cell, orphaning the surviving half of any broken coupler.
+  // A matted clog is not removed: the flush strips its mat and leaves a plain
+  // clog in its place, to be cleared by another line.
   function clearMatches(board, hits) {
-    var clogs = 0, segments = 0;
+    var clogs = 0, segments = 0, stripped = 0;
     hits.forEach(function (i) {
       var cell = board[i];
       if (!cell) return;
-      if (cell.type === 'clog') clogs++; else segments++;
+      if (cell.matted) stripped++;
+      else if (cell.type === 'clog') clogs++;
+      else segments++;
     });
     hits.forEach(function (i) {
       var cell = board[i];
@@ -162,8 +174,11 @@
       var p = partnerIndex(board, i, cell.link);
       if (p >= 0 && board[p] && !hits.has(p)) board[p].link = null;
     });
-    hits.forEach(function (i) { board[i] = null; });
-    return { clogs: clogs, segments: segments };
+    hits.forEach(function (i) {
+      if (board[i] && board[i].matted) board[i].matted = false;
+      else board[i] = null;
+    });
+    return { clogs: clogs, segments: segments, stripped: stripped };
   }
 
   /* ---------------------------------------------------------------- gravity */
@@ -221,7 +236,7 @@
   // Full clear/gravity cascade, used by tests and headless simulation.
   // The live game runs the same sequence one animated step at a time.
   function resolve(board) {
-    var chain = 0, clogs = 0, segments = 0;
+    var chain = 0, clogs = 0, segments = 0, stripped = 0;
     for (;;) {
       var hits = findMatches(board);
       if (hits.size === 0) break;
@@ -229,9 +244,10 @@
       var got = clearMatches(board, hits);
       clogs += got.clogs;
       segments += got.segments;
+      stripped += got.stripped;
       settle(board);
     }
-    return { chain: chain, clogs: clogs, segments: segments };
+    return { chain: chain, clogs: clogs, segments: segments, stripped: stripped };
   }
 
   /* ---------------------------------------------------------------- pieces */
@@ -485,10 +501,28 @@
     return snags[(rand() * snags.length) | 0];
   }
 
-  function placeClog(board, col, row, color) {
+  function placeClog(board, col, row, color, matted) {
     if (!inBounds(board, col, row)) return false;
-    board[idx(board, col, row)] = { color: color, type: 'clog', link: null };
+    var cell = { color: color, type: 'clog', link: null };
+    if (matted) cell.matted = true;
+    board[idx(board, col, row)] = cell;
     return true;
+  }
+
+  // Past level 16 some clogs are matted, and the share grows every level, from
+  // one in ten at level 17 to about three in five at the top.
+  var MATTED_FROM = 17;
+  var MATTED_BASE = 0.1;
+  var MATTED_PER_LEVEL = 0.015;
+
+  function mattedShare(level) {
+    if ((level || 0) < MATTED_FROM) return 0;
+    return Math.min(1, MATTED_BASE + (level - MATTED_FROM) * MATTED_PER_LEVEL);
+  }
+
+  function rollMatted(level, rand) {
+    var share = mattedShare(level);
+    return share > 0 && (rand || Math.random)() < share;
   }
 
   // Clogs sit in the bottom of the pipe. Seeding them high makes them nearly
@@ -544,7 +578,12 @@
 
       for (var m = 0; m < order.length; m++) {
         board[i] = { color: order[m], type: 'clog', link: null };
-        if (runThrough(board, cc, rr) < 3) { want[order[m]]--; placed++; break; }
+        if (runThrough(board, cc, rr) < 3) {
+          if (rollMatted(level, rand)) board[i].matted = true;
+          want[order[m]]--;
+          placed++;
+          break;
+        }
         board[i] = null;
       }
     }
@@ -628,7 +667,8 @@
     seedLevel: seedLevel, clogTotal: clogTotal, countClogs: countClogs,
     clogSeedCount: clogSeedCount, dripEvery: dripEvery, balancedColors: balancedColors,
     dripLanding: dripLanding, dripColumn: dripColumn, placeClog: placeClog,
-    dripTarget: dripTarget, dripSnagRows: dripSnagRows, snagMinRow: snagMinRow,
+    dripTarget: dripTarget,
+    mattedShare: mattedShare, rollMatted: rollMatted, MATTED_FROM: MATTED_FROM, dripSnagRows: dripSnagRows, snagMinRow: snagMinRow,
     DRIP_SNAG_CHANCE: DRIP_SNAG_CHANCE,
     shuffle: shuffle,
     runThrough: runThrough, fallInterval: fallInterval,
