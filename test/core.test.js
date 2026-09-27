@@ -260,7 +260,7 @@ function lcg(seed) {
     check('level ' + level + ' has no 3-in-a-line at seed', noTriples);
 
     // No colour may run away with a level.
-    const tally = [0, 0, 0];
+    const tally = new Array(C.colorsFor(level)).fill(0);
     b.forEach((cell) => { if (cell) tally[cell.color]++; });
     pending.forEach((c) => { tally[c]++; });
     const spread = Math.max(...tally) - Math.min(...tally);
@@ -674,6 +674,27 @@ function lcg(seed) {
   for (let i = 0; i < 1000; i++) if (C.rollBurst(C.MAX_LEVEL, rand)) pairs++;
   check('the top level pairs most arrivals', pairs > 600 && pairs < 950, 'pairs=' + pairs);
   check('an early level never rolls a pair', !C.rollBurst(10, () => 0));
+}
+
+/* ------------------------------------------------------- a fourth colour */
+{
+  eq('three colours before level 34', C.colorsFor(C.FOURTH_FROM - 1), 3);
+  eq('four from level 34', C.colorsFor(C.FOURTH_FROM), 4);
+  eq('and four at the top', C.colorsFor(C.MAX_LEVEL), 4);
+  check('a snapshot can hold every colour in play', C.COLORS >= C.colorsFor(C.MAX_LEVEL));
+  const { board: b, pending } = C.seedLevel(C.FOURTH_FROM, lcg(5));
+  const seen = new Set(pending);
+  b.forEach((x) => { if (x) seen.add(x.color); });
+  eq('a four-colour level deals clogs in all four', seen.size, 4);
+  const early = new Set();
+  const r3 = lcg(8), r4 = lcg(8);
+  const late = new Set();
+  for (let i = 0; i < 200; i++) {
+    C.randomColors(r3).forEach((c) => early.add(c));
+    C.randomColors(r4, 4).forEach((c) => late.add(c));
+  }
+  eq('couplings default to three colours', early.size, 3);
+  eq('and use four when asked', late.size, 4);
 }
 
 /* ---------------------------------------------------------------- trophy */

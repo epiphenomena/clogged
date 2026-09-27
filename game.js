@@ -28,7 +28,9 @@
   var PALETTE = [
     { light: '#9ff6ea', main: '#2dd4bf', dark: '#12897c', deep: '#084a44', rgb: '45,212,191' },
     { light: '#ffdf9a', main: '#f59e0b', dark: '#a96a06', deep: '#5f3a03', rgb: '245,158,11' },
-    { light: '#f9c7ff', main: '#e879f9', dark: '#a132ba', deep: '#5c1a6b', rgb: '232,121,249' }
+    { light: '#f9c7ff', main: '#e879f9', dark: '#a132ba', deep: '#5c1a6b', rgb: '232,121,249' },
+    // joins from level 34 (Core.FOURTH_FROM)
+    { light: '#e4fbb0', main: '#a3e635', dark: '#5f8a12', deep: '#2f4708', rgb: '163,230,53' }
   ];
 
   // The trophy's metal, by tier (see Core.trophyFor). style.css carries the
@@ -405,6 +407,11 @@
       ctx.arc(cx, cy, g, 0, Math.PI * 2);
     } else if (color === 1) {
       ctx.moveTo(cx - g, cy); ctx.lineTo(cx + g, cy);
+    } else if (color === 3) {
+      ctx.moveTo(cx, cy - g * 1.1);
+      ctx.lineTo(cx + g, cy + g * 0.75);
+      ctx.lineTo(cx - g, cy + g * 0.75);
+      ctx.closePath();
     } else {
       ctx.moveTo(cx - g, cy - g); ctx.lineTo(cx + g, cy + g);
       ctx.moveTo(cx + g, cy - g); ctx.lineTo(cx - g, cy + g);
@@ -1212,15 +1219,23 @@
     S.pressure = 0;
     S.locks = 0;
     S.hint = 1;
-    S.nextColors = C.randomColors();
+    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level));
     hideAllOverlays();
     spawn();
+    announce(S.level);
     refreshHUD();
+  }
+
+  // The level where something new turns up says so as it opens.
+  function announce(level) {
+    if (level === C.MATTED_FROM) toast('MATTED CLOGS', '#ffdf9a');
+    else if (level === C.BURST_FROM) toast('CLOGS IN PAIRS', '#ffdf9a');
+    else if (level === C.FOURTH_FROM) toast('A FOURTH COLOUR', '#e4fbb0');
   }
 
   function spawn() {
     S.piece = C.spawnPiece(S.board, S.nextColors);
-    S.nextColors = C.randomColors();
+    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level));
     drawNext();
     S.fallTimer = 0;
     S.lockPending = false;
@@ -1927,7 +1942,8 @@
   function updateLevelPicker() {
     var d = C.dimsFor(S.startLevel);
     $('lv-num').textContent = 'Level ' + S.startLevel;
-    $('lv-clogs').textContent = C.clogTotal(S.startLevel) + ' clogs · ' + d.w + '×' + d.h;
+    $('lv-clogs').textContent = C.clogTotal(S.startLevel) + ' clogs · ' + d.w + '×' + d.h
+      + ' · ' + C.colorsFor(S.startLevel) + ' colours';
     $('menu-best').textContent = 'Best: ' + S.best;
   }
 

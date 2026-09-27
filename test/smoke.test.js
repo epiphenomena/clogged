@@ -1071,6 +1071,31 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   check('late on, clogs can arrive two at a time', late === 2, 'most=' + late);
 }
 
+/* ---------------------------------------------------------- fourth colour */
+{
+  const coloursDealtAt = (level) => {
+    const seen = new Set();
+    startAt(level);
+    for (let i = 0; i < 4000 && seen.size < 4 && !visible('ov-gameover') && !visible('ov-clear'); i++) {
+      if (pendingSpawn) { pendingSpawn = false; liveColors.forEach((c) => seen.add(c)); }
+      if (i % 4 === 0) global.document.fire('keydown', { key: ' ' });
+      tick(16);
+    }
+    if (visible('ov-gameover')) el('btn-menu').fire('click');
+    else if (visible('ov-clear')) { el('btn-next-level').fire('click'); el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
+    else { el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
+    return seen;
+  };
+  const before = coloursDealtAt(C.FOURTH_FROM - 1);
+  check('couplings come in three colours before the fourth arrives',
+    !before.has(3) && before.size === 3, [...before].join(','));
+  const after = coloursDealtAt(C.FOURTH_FROM);
+  check('couplings come in the fourth colour from its level', after.has(3), [...after].join(','));
+  pick(C.FOURTH_FROM);
+  check('the level picker says how many colours a level uses',
+    / 4 colours$/.test(el('lv-clogs').textContent), el('lv-clogs').textContent);
+}
+
 /* ------------------------------------------------------ winning the game */
 {
   const saved = () => Sc.sanitize(JSON.parse(store.get('clogged.history') || 'null'));

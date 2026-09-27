@@ -31,7 +31,11 @@
   var MAX_W = 12;
   var MAX_H = 24;
 
-  var COLORS = 3;
+  // Three colours until level 34, when a fourth joins them. COLORS is the most
+  // any level uses, which is what a snapshot may hold.
+  var BASE_COLORS = 3;
+  var COLORS = 4;
+  var FOURTH_FROM = 34;
   var MIN_RUN = 4;
   var MAX_LEVEL = 50;   // flushing this one wins the game
   // Pressure is meant to punish stalling, not ordinary play. Nothing happens at
@@ -361,9 +365,14 @@
     return { c: (dims(board).w >> 1) - 1, r: 0, orient: 0, colors: colors };
   }
 
-  function randomColors(rand) {
+  function colorsFor(level) {
+    return (level || 0) >= FOURTH_FROM ? COLORS : BASE_COLORS;
+  }
+
+  function randomColors(rand, colors) {
     rand = rand || Math.random;
-    return [(rand() * COLORS) | 0, (rand() * COLORS) | 0];
+    var k = colors || BASE_COLORS;
+    return [(rand() * k) | 0, (rand() * k) | 0];
   }
 
   /* ---------------------------------------------------------------- seeding */
@@ -446,11 +455,12 @@
 
   // A level's colours, spread as evenly as the count allows, so no single
   // colour can dominate and strand the others.
-  function balancedColors(n, rand) {
+  function balancedColors(n, rand, colors) {
     rand = rand || Math.random;
-    var offset = (rand() * COLORS) | 0;
+    var k = colors || BASE_COLORS;
+    var offset = (rand() * k) | 0;
     var out = [];
-    for (var i = 0; i < n; i++) out.push((i + offset) % COLORS);
+    for (var i = 0; i < n; i++) out.push((i + offset) % k);
     return shuffle(out, rand);
   }
 
@@ -570,11 +580,12 @@
     rand = rand || Math.random;
     var board = makeBoardFor(level);
     var W = board.w, H = board.h;
-    var quota = balancedColors(clogTotal(level), rand);
+    var colors = colorsFor(level);
+    var quota = balancedColors(clogTotal(level), rand, colors);
     var seedN = Math.min(quota.length, clogSeedCount(level));
 
     var want = [];
-    for (var z = 0; z < COLORS; z++) want.push(0);
+    for (var z = 0; z < colors; z++) want.push(0);
     for (var q = 0; q < seedN; q++) want[quota[q]]++;
 
     var top = seedTopRow(level, H);
@@ -591,7 +602,7 @@
       var cc = i % W, rr = (i / W) | 0;
 
       var order = [];
-      for (var k = 0; k < COLORS; k++) if (want[k] > 0) order.push(k);
+      for (var k = 0; k < colors; k++) if (want[k] > 0) order.push(k);
       if (!order.length) break;
       shuffle(order, rand);
 
@@ -610,7 +621,7 @@
     // Anything that could not be placed joins the queue, so the level's total
     // and its colour balance hold either way.
     var pending = quota.slice(seedN);
-    for (var k2 = 0; k2 < COLORS; k2++) {
+    for (var k2 = 0; k2 < colors; k2++) {
       for (var n = 0; n < want[k2]; n++) pending.push(k2);
     }
     return { board: board, pending: shuffle(pending, rand) };
@@ -672,7 +683,8 @@
   return {
     TROPHIES: TROPHIES, trophyFor: trophyFor,
     BASE_W: BASE_W, BASE_H: BASE_H, MAX_W: MAX_W, MAX_H: MAX_H,
-    COLORS: COLORS, MIN_RUN: MIN_RUN, MAX_LEVEL: MAX_LEVEL,
+    COLORS: COLORS, BASE_COLORS: BASE_COLORS, FOURTH_FROM: FOURTH_FROM, colorsFor: colorsFor,
+    MIN_RUN: MIN_RUN, MAX_LEVEL: MAX_LEVEL,
     DIRS: DIRS, OFFSETS: OFFSETS, LINKS: LINKS, OPPOSITE: OPPOSITE,
     dimsFor: dimsFor, dims: dims,
     idx: idx, colOf: colOf, rowOf: rowOf, inBounds: inBounds, cellAt: cellAt,

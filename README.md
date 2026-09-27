@@ -46,6 +46,9 @@ A few details make or break a plan:
 - **Arrivals come in bursts.** From level 25 a clog can wash down with a
   second one straight behind it, before your next coupling. The chance starts
   at about one in seven and climbs every level to four in five at level 50.
+- **A fourth colour joins at level 34.** Couplings and clogs both come in lime
+  as well from then on, so lining four up takes more planning. The level
+  picker says how many colours a level uses.
 - **Some clogs are matted.** From level 17 a share of the hairballs — arrivals
   included — come bound in a braided collar with two bands lashed across them.
   A line through one only strips the mat off (for half a clog's points) and
@@ -143,8 +146,8 @@ Anything still blocked after that is refused and the coupling keeps its current
 orientation. In a one-wide well — no room either side at its own row or the row
 above — it simply stays lying down.
 
-Each colour also carries a shape — ring, bar, cross — so the game is playable
-without relying on colour vision.
+Each colour also carries a shape — ring, bar, cross, and from level 34 a
+triangle — so the game is playable without relying on colour vision.
 
 ## Picking up where you left off
 
