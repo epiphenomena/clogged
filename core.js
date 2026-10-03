@@ -31,12 +31,12 @@
   var MAX_W = 12;
   var MAX_H = 24;
 
-  // Three colours until level 25, a fourth from there, and a fifth from 38.
+  // Three colours until level 20, a fourth from there, and a fifth from 32.
   // COLORS is the most any level uses, which is what a snapshot may hold.
   var BASE_COLORS = 3;
   var COLORS = 5;
-  var FOURTH_FROM = 25;
-  var FIFTH_FROM = 38;
+  var FOURTH_FROM = 20;
+  var FIFTH_FROM = 32;
   var MIN_RUN = 4;
   var MAX_LEVEL = 50;   // flushing this one wins the game
   // Pressure is meant to punish stalling, not ordinary play. Nothing happens at
@@ -403,10 +403,40 @@
     return best;
   }
 
+  // A level that brings in something new eases off for a few levels while the
+  // player learns it: fewer clogs, a slower fall, arrivals spaced further apart.
+  // A new colour weighs most, since every colour added makes a line of four
+  // that much harder to come by. The breather is full on the level that
+  // introduces it and fades out over the next EASE_LEVELS.
+  var EASE_LEVELS = 4;
+  var EASE_CLOGS = 0.4;     // up to 40% fewer clogs
+  var EASE_FALL = 0.3;      // up to 30% slower fall
+  var EASE_DRIP = 0.5;      // from this much ease, one more coupling between arrivals
+
+  function introductions() {
+    return [
+      { from: MATTED_FROM, weight: 0.5 },
+      { from: FOURTH_FROM, weight: 1 },
+      { from: FIFTH_FROM, weight: 1 }
+    ];
+  }
+
+  // 0 on an ordinary level, up to 1 on the one that brings in a new colour.
+  function easeFor(level) {
+    var l = level || 0, best = 0;
+    introductions().forEach(function (it) {
+      if (l < it.from) return;
+      var e = it.weight * Math.max(0, 1 - (l - it.from) / EASE_LEVELS);
+      if (e > best) best = e;
+    });
+    return best;
+  }
+
   // The whole quota for a level, seeded and dripped together. This used to add
   // four per level up to 64, which outran the player badly.
   function clogTotal(level) {
-    return Math.min(4 + level * 2, 40);
+    var l = Math.max(0, level || 0);
+    return Math.round(Math.min(4 + l * 2, 40) * (1 - EASE_CLOGS * easeFor(l)));
   }
 
   // How much of the quota is already wedged in when the level opens. The share
@@ -425,7 +455,7 @@
 
   // Couplings landed between one arrival and the next.
   function dripEvery(level) {
-    return Math.max(2, 4 - Math.floor(level / 8));
+    return Math.max(2, 4 - Math.floor(level / 8)) + (easeFor(level) >= EASE_DRIP ? 1 : 0);
   }
 
   function shuffle(list, rand) {
@@ -629,15 +659,16 @@
   }
 
   var FALL_BASE_MS = 520;      // level 0, on the pipe the game opens with
-  var FALL_PER_LEVEL_MS = 16;
-  var FALL_FLOOR_MS = 200;
+  var FALL_PER_LEVEL_MS = 10;
+  var FALL_FLOOR_MS = 220;
 
   // Milliseconds per row of free fall. A taller pipe gets a shorter interval,
   // so a coupling takes about the same time to cross the screen whatever size
   // the fittings are: the rows are smaller, not slower.
   function fallInterval(level, elapsedMs, h) {
     var base = Math.max(FALL_FLOOR_MS,
-      FALL_BASE_MS - Math.max(0, level || 0) * FALL_PER_LEVEL_MS);
+      FALL_BASE_MS - Math.max(0, level || 0) * FALL_PER_LEVEL_MS) *
+      (1 + EASE_FALL * easeFor(level));
     var scaled = base * (BASE_H / (h || BASE_H));
     return scaled * Math.pow(PRESSURE_FACTOR, pressureStep(level, elapsedMs));
   }
@@ -682,6 +713,7 @@
     clogSeedCount: clogSeedCount, dripEvery: dripEvery, balancedColors: balancedColors,
     dripLanding: dripLanding, dripColumn: dripColumn, placeClog: placeClog,
     dripTarget: dripTarget,
+    easeFor: easeFor, introductions: introductions, EASE_LEVELS: EASE_LEVELS,
     mattedShare: mattedShare, rollMatted: rollMatted, MATTED_FROM: MATTED_FROM, dripSnagRows: dripSnagRows, snagMinRow: snagMinRow,
     DRIP_SNAG_CHANCE: DRIP_SNAG_CHANCE,
     shuffle: shuffle,

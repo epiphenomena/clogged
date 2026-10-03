@@ -48,9 +48,9 @@ A few details make or break a plan:
   speed up a few percent every 30 seconds, topping out around 1.7× after five
   and a half minutes of stalling. It punishes dithering, not ordinary play.
 
-Past level 16 the pipe has stopped growing and the speed is near its cap, so
-two things keep the difficulty climbing to the top — each one announced on
-the level it first turns up:
+The fall speed climbs gently, reaching its cap around level 30. Past level 16
+the pipe has stopped growing, so two more things keep the difficulty climbing
+to the top — each one announced on the level it first turns up:
 
 - **Some clogs are matted.** From level 17 a share of the hairballs — arrivals
   included — come bound in a double braided collar.
@@ -58,9 +58,14 @@ the level it first turns up:
   leaves a plain hairball where it was, which takes a second line to clear.
   One in ten is matted at level 17, rising every level to about three in five
   at level 50.
-- **More colours.** A fourth colour, red, joins at level 25, and a fifth,
-  blue, at level 38. Couplings and clogs both use them, so four of a kind
+- **More colours.** A fourth colour, red, joins at level 20, and a fifth,
+  blue, at level 32. Couplings and clogs both use them, so four of a kind
   takes more planning. The level picker says how many colours a level uses.
+
+Each new thing comes with a breather. The level that introduces a colour has
+40% fewer clogs, falls 30% slower and spaces arrivals out further, and that
+eases back to normal over the next four levels. The matted clogs get half as
+much slack.
 
 Chains multiply your score: each cascade step in a single landing doubles the
 multiplier, up to 16×.

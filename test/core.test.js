@@ -278,9 +278,27 @@ function lcg(seed) {
     C.clogTotal(4) + ' -> ' + C.clogTotal(5));
   check('a mid level is far lighter than it used to be', C.clogTotal(10) < 44,
     'total=' + C.clogTotal(10));
-  check('clog totals never decrease with level',
-    Array.from({ length: C.MAX_LEVEL }, (_, i) => C.clogTotal(i + 1) >= C.clogTotal(i))
+  check('clog totals only drop where something new comes in',
+    Array.from({ length: C.MAX_LEVEL }, (_, i) =>
+      C.clogTotal(i + 1) >= C.clogTotal(i) || C.easeFor(i + 1) > C.easeFor(i))
       .every(Boolean));
+
+  // A new colour makes every line harder to build, so its level backs off.
+  [C.FOURTH_FROM, C.FIFTH_FROM].forEach(function (level) {
+    check('level ' + level + ' brings fewer clogs than the one before',
+      C.clogTotal(level) < C.clogTotal(level - 1),
+      C.clogTotal(level - 1) + ' -> ' + C.clogTotal(level));
+    check('level ' + level + ' falls slower than the one before',
+      C.fallInterval(level, 0, C.dimsFor(level).h) >
+        C.fallInterval(level - 1, 0, C.dimsFor(level - 1).h));
+    check('level ' + level + ' spaces arrivals out',
+      C.dripEvery(level) > C.dripEvery(level - 1));
+    check('the breather after level ' + level + ' is gone in a few levels',
+      C.easeFor(level + C.EASE_LEVELS) === 0);
+  });
+  check('the matted clogs ease off too, though less',
+    C.easeFor(C.MATTED_FROM) > 0 && C.easeFor(C.MATTED_FROM) < C.easeFor(C.FOURTH_FROM));
+  eq('the early game has no breather', C.easeFor(10), 0);
 
   // Later levels hold more of their quota back rather than showing it all.
   check('a hard level opens with fewer clogs than it holds',
@@ -439,14 +457,19 @@ function lcg(seed) {
   check('speed has a floor', C.fallInterval(99, 0, h) >= C.FALL_FLOOR_MS * 0.6);
 
   // Every level is at least as quick as the one before, across the changes of
-  // pipe size as well as within them.
+  // pipe size as well as within them, except where a new mechanic buys a
+  // breather.
   let prev = Infinity;
   for (let level = 0; level <= C.MAX_LEVEL; level++) {
     const ms = C.fallInterval(level, 0, C.dimsFor(level).h);
-    check('level ' + level + ' is no slower than the one before it', ms <= prev,
-      ms + ' vs ' + prev);
+    check('level ' + level + ' is no slower than the one before it',
+      ms <= prev || C.easeFor(level) > C.easeFor(level - 1), ms + ' vs ' + prev);
     prev = ms;
   }
+
+  // The climb is gentle: the floor is not reached until well past halfway.
+  check('the fall speed is still climbing at level 20',
+    C.fallInterval(20, 0, C.BASE_H) > C.FALL_FLOOR_MS);
 
   // A taller pipe has smaller rows, so a coupling crosses the screen in about
   // the same time rather than trudging down half again as many of them.
