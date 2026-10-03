@@ -1976,8 +1976,8 @@
 
   $('btn-scores').addEventListener('click', function () { openScores('ov-menu'); });
 
-  // Copies the game's public address, wherever this copy happens to be served
-  // from, and says so on the button for a moment.
+  // Copies the game's public address (always the published one, even from a
+  // local copy) and says so on the button for a moment.
   var SHARE_URL = 'https://epiphenomena.github.io/clogged/';
   function copyText(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {

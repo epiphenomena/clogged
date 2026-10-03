@@ -231,9 +231,9 @@ node test/smoke.test.js   # boots the real game.js against a stubbed DOM and pla
 The first covers match detection, coupling splitting, gravity, cascades, rotation
 kicks, level seeding, arrivals, and the pressure ramp; the second covers
 recording, the two caps, ranking, and surviving junk in storage; the third covers
-snapshot round-trips and every way a stored record can be malformed. The last
-stubs enough DOM and
-canvas for [`game.js`](game.js) to run headlessly, then drives it with a greedy
+snapshot round-trips and every way a stored record can be malformed; the fourth
+checks that every level has a line between levels and that each new mechanic
+gets its story. The last stubs enough DOM and canvas for [`game.js`](game.js) to run headlessly, then drives it with a greedy
 player that clears levels — so wiring and state-machine regressions get caught
 without a browser. All five are plain scripts with no dependencies; run them
 before you push. They use nothing beyond the language, so `bun test/core.test.js`

@@ -468,8 +468,8 @@ function lcg(seed) {
   }
 
   // The climb is gentle: the floor is not reached until well past halfway.
-  check('the fall speed is still climbing at level 20',
-    C.fallInterval(20, 0, C.BASE_H) > C.FALL_FLOOR_MS);
+  check('the fall speed is still climbing at level 26',
+    C.fallInterval(26, 0, C.BASE_H) > C.FALL_FLOOR_MS);
 
   // A taller pipe has smaller rows, so a coupling crosses the screen in about
   // the same time rather than trudging down half again as many of them.
