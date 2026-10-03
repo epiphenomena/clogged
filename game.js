@@ -194,6 +194,7 @@
 
   var Sc = self.Scores;
   var Sv = self.Save;
+  var Q = self.Quips;
   var SAVE_LIMITS = { maxW: C.MAX_W, maxH: C.MAX_H, colors: C.COLORS, maxLevel: C.MAX_LEVEL };
   var history = Sc.seedBest(Sc.sanitize(Store.get('history', null)), S.best);
 
@@ -1227,6 +1228,8 @@
     saveBest();  // mid-run: bank the best, but the run is not over
     refreshHUD();
     $('clear-info').textContent = 'Level ' + S.level + ' flushed · Score ' + S.score;
+    $('clear-next').textContent = 'Up next: level ' + (S.level + 1);
+    $('clear-story').textContent = Q.quipFor(S.level + 1, C);
     startFx('flush', 'ov-clear');
   }
 
@@ -1972,6 +1975,44 @@
   });
 
   $('btn-scores').addEventListener('click', function () { openScores('ov-menu'); });
+
+  // Copies the game's public address, wherever this copy happens to be served
+  // from, and says so on the button for a moment.
+  var SHARE_URL = 'https://epiphenomena.github.io/clogged/';
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(function () { return copyLegacy(text); });
+    }
+    return copyLegacy(text);
+  }
+  function copyLegacy(text) {
+    return new Promise(function (ok, fail) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var done = false;
+      try { done = document.execCommand('copy'); } catch (e) { /* refused */ }
+      document.body.removeChild(ta);
+      if (done) ok(); else fail(new Error('copy refused'));
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.share-btn'), function (btn) {
+    var label = btn.textContent;
+    var timer = null;
+    btn.addEventListener('click', function () {
+      function say(text) {
+        btn.textContent = text;
+        clearTimeout(timer);
+        timer = setTimeout(function () { btn.textContent = label; }, 1800);
+      }
+      copyText(SHARE_URL).then(function () { say('Link copied!'); },
+        function () { say(SHARE_URL); });
+    });
+  });
   $('btn-go-scores').addEventListener('click', function () { openScores('ov-gameover'); });
   $('btn-win-scores').addEventListener('click', function () { openScores('ov-win'); });
   $('btn-win-menu').addEventListener('click', toMenu);

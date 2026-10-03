@@ -168,6 +168,15 @@ body {
 .tagline { margin: 0 0 16px; font-size: 14px; line-height: 1.55; color: var(--muted); }
 .result-line { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
 .best-line { margin: 0 0 16px; font-size: 13px; color: var(--muted); }
+.next-line {
+  margin: 14px 0 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.story { margin: 0 0 18px; font-size: 14px; line-height: 1.55; font-style: italic; }
 
 .howto {
   margin: 16px 0 0;

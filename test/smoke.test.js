@@ -111,6 +111,10 @@ global.document = {
     if (!els.has(id)) els.set(id, makeEl(id));
     return els.get(id);
   },
+  querySelectorAll(sel) {
+    return sel === '.share-btn'
+      ? ['btn-share', 'btn-win-share'].map((id) => this.getElementById(id)) : [];
+  },
   addEventListener(t, fn) {
     if (!this._listeners.has(t)) this._listeners.set(t, []);
     this._listeners.get(t).push(fn);
@@ -131,7 +135,10 @@ global.localStorage = {
 global.devicePixelRatio = 2;
 // node defines navigator/location as getter-only globals; redefine them.
 Object.defineProperty(global, 'navigator', {
-  value: { serviceWorker: { register: () => Promise.resolve() } },
+  value: {
+    serviceWorker: { register: () => Promise.resolve() },
+    clipboard: { writeText: (t) => { global.copied = t; return Promise.resolve(); } }
+  },
   configurable: true, writable: true
 });
 Object.defineProperty(global, 'location', {
@@ -174,6 +181,7 @@ Math.random = () => ((rngState = (rngState * 1664525 + 1013904223) >>> 0) / 4294
 global.self.Core = require(path.join(ROOT, 'core.js'));
 global.self.Scores = require(path.join(ROOT, 'scores.js'));
 global.self.Save = require(path.join(ROOT, 'save.js'));
+global.self.Quips = require(path.join(ROOT, 'quips.js'));
 const C = global.self.Core;
 const Sc = global.self.Scores;
 const Sv = global.self.Save;
@@ -217,6 +225,9 @@ function check(name, cond, detail) {
 });
 
 check('menu is visible at boot', visible('ov-menu'));
+el('btn-share').fire('click');
+check('share copies the link to the game', global.copied === 'https://epiphenomena.github.io/clogged/',
+  String(global.copied));
 // The canvas fills the viewport via CSS; JS only sets the backing-store size.
 check('board canvas got a pixel size', el('board').width > 0,
   'width=' + el('board').width);
@@ -452,6 +463,9 @@ check('clearing the level scored points', Number(el('hud-score').textContent) > 
   'score=' + el('hud-score').textContent);
 check('level clear names the level', /Level 0 flushed/.test(el('clear-info').textContent),
   el('clear-info').textContent);
+check('the screen before level 1 tells the story',
+  /plumber/.test(el('clear-story').textContent) && /level 1/.test(el('clear-next').textContent),
+  el('clear-next').textContent + ' / ' + el('clear-story').textContent);
 check('best score persisted', store.has('clogged.best'), [...store.keys()].join(','));
 check('the HUD steps aside for the flush effect',
   global.document.body.classes.has('fx-active'));

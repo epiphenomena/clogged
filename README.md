@@ -62,6 +62,10 @@ to the top — each one announced on the level it first turns up:
   blue, at level 32. Couplings and clogs both use them, so four of a kind
   takes more planning. The level picker says how many colours a level uses.
 
+The screen between levels tells the story of the household whose drain this
+is, and each new thing is introduced there with its own chapter. The title
+screen and the win screen have a Share button that copies the game's link.
+
 Each new thing comes with a breather. The level that introduces a colour has
 40% fewer clogs, falls 30% slower and spaces arrivals out further, and that
 eases back to normal over the next four levels. The matted clogs get half as
@@ -220,6 +224,7 @@ with no DOM access, so they can be tested directly:
 node test/core.test.js    # board rules
 node test/scores.test.js  # score history
 node test/save.test.js    # suspended-game snapshots
+node test/quips.test.js   # the level-clear story lines
 node test/smoke.test.js   # boots the real game.js against a stubbed DOM and plays it
 ```
 
@@ -230,7 +235,7 @@ snapshot round-trips and every way a stored record can be malformed. The last
 stubs enough DOM and
 canvas for [`game.js`](game.js) to run headlessly, then drives it with a greedy
 player that clears levels — so wiring and state-machine regressions get caught
-without a browser. All four are plain scripts with no dependencies; run them
+without a browser. All five are plain scripts with no dependencies; run them
 before you push. They use nothing beyond the language, so `bun test/core.test.js`
 works too (or `deno run -A --unstable-detect-cjs`) if node is unavailable.
 
@@ -239,6 +244,7 @@ works too (or `deno run -A --unstable-detect-cjs`) if node is unavailable.
 | `core.js` | Board rules — matching, gravity, cascades, seeding, arrivals, speed |
 | `scores.js` | Score history — the rolling window and the all-time table |
 | `save.js` | Suspended-game snapshots, and the validation that guards them |
+| `quips.js` | What the level-clear screen says about the level coming up |
 | `game.js` | Canvas rendering, gestures, game loop, scoring, effects |
 | `style.css` | Layout and theming, mobile-first |
 | `sw.js` | Offline fallback (see the caching note above) |
