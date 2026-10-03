@@ -113,7 +113,7 @@ global.document = {
   },
   querySelectorAll(sel) {
     return sel === '.share-btn'
-      ? ['btn-share', 'btn-win-share'].map((id) => this.getElementById(id)) : [];
+      ? ['btn-share', 'btn-pause-share', 'btn-win-share'].map((id) => this.getElementById(id)) : [];
   },
   addEventListener(t, fn) {
     if (!this._listeners.has(t)) this._listeners.set(t, []);

@@ -58,13 +58,13 @@ to the top — each one announced on the level it first turns up:
   leaves a plain hairball where it was, which takes a second line to clear.
   One in ten is matted at level 17, rising every level to about three in five
   at level 50.
-- **More colours.** A fourth colour, red, joins at level 20, and a fifth,
-  blue, at level 32. Couplings and clogs both use them, so four of a kind
+- **More colours.** A fourth colour joins at level 20, and a fifth at
+  level 32. (The screenshots above stick to the opening three on purpose.) Couplings and clogs both use them, so four of a kind
   takes more planning. The level picker says how many colours a level uses.
 
 The screen between levels tells the story of the household whose drain this
-is, and each new thing is introduced there with its own chapter. The title
-screen and the win screen have a Share button that copies the game's link.
+is, and each new thing is introduced there with its own chapter. The title,
+pause and win screens have a Share button that copies the game's link.
 
 Each new thing comes with a breather. The level that introduces a colour has
 40% fewer clogs, falls 30% slower and spaces arrivals out further, and that
