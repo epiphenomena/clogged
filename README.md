@@ -66,6 +66,11 @@ The screen between levels tells the story of the household whose drain this
 is, and each new thing is introduced there with its own chapter. The title,
 pause and win screens have a Share button that copies the game's link.
 
+**Challenge mode** is a switch on the title screen that deals the fourth
+colour from level 1 instead of level 20 (the fifth still waits for 32). It
+applies to the next new game; a suspended run resumes in whichever mode it was
+started in, and challenge runs carry a small C in the top-ten table.
+
 Each new thing comes with a breather. The level that introduces a colour has
 40% fewer clogs, falls 30% slower and spaces arrivals out further, and that
 eases back to normal over the next four levels. The matted clogs get half as

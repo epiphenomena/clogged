@@ -123,11 +123,16 @@ body {
   align-items: center;
   justify-content: center;
   padding: calc(var(--safe-top) + 16px) 18px calc(var(--safe-bottom) + 16px);
+  overflow-y: auto;
   background: rgba(7, 10, 20, 0.8);
   backdrop-filter: blur(7px);
   -webkit-backdrop-filter: blur(7px);
   animation: fade 0.18s ease-out;
 }
+
+/* Auto margins centre the panel but, unlike align-items, give way when it is
+   taller than the screen, so it scrolls from its top instead of losing it. */
+.overlay > .panel { margin: auto; }
 
 /* Win and loss panels sit over a full-screen canvas effect, so they stay
    mostly transparent and skip the blur that would smear it. */
@@ -189,6 +194,15 @@ body {
 
 .howto b { color: var(--text); font-weight: 700; }
 
+/* Short phones: the title screen holds a resume button, the level picker and
+   the challenge switch, so it gives back some air to stay on one screen. */
+@media (max-height: 700px) {
+  .panel { padding: 18px 20px; }
+  .tagline { margin-bottom: 10px; }
+  .best-line { margin-bottom: 12px; }
+  .howto { margin-top: 10px; line-height: 1.7; }
+}
+
 .level-picker {
   display: flex;
   align-items: center;
@@ -249,6 +263,58 @@ body {
 }
 
 .ghost-btn:active { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+
+/* A switch for the run's mode. The pressed state is the only source of truth. */
+.toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.toggle-text { font-size: 14px; font-weight: 600; }
+.toggle-text small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.switch {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.15s;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.toggle-btn[aria-pressed="true"] { border-color: var(--accent); }
+.toggle-btn[aria-pressed="true"] .switch { background: var(--accent); }
+.toggle-btn[aria-pressed="true"] .switch::after { transform: translateX(18px); }
+@media (prefers-reduced-motion: reduce) {
+  .switch, .switch::after { transition: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .overlay { animation: none; }
@@ -428,3 +494,14 @@ body.fx-active #hud { opacity: 0; pointer-events: none; }
 
 /* A won run in the top table carries a small plunger in its metal. */
 .score-table .badge { width: 9px; height: 12px; vertical-align: -1px; fill: var(--t-main); }
+.score-table .chal {
+  display: inline-block;
+  margin-left: 2px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  color: var(--accent);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}

@@ -5,7 +5,8 @@
  * or localStorage (see test/scores.test.js). The caller owns persistence.
  *
  * A run is { s: score, l: level reached, t: epoch ms }, plus w: 1 when the run
- * flushed the last level and won the game.
+ * flushed the last level and won the game, and c: 1 when it was played in
+ * challenge mode.
  *
  * Two lists are kept rather than one, deliberately: `runs` is a rolling window
  * for the timeline, while `top` is never evicted by age, so a great score from
@@ -36,6 +37,8 @@
     };
     // Only a win is marked, so the stored shape of every other run is unchanged.
     if (r.w === 1 || r.w === true) out.w = 1;
+    // Likewise a run played in challenge mode.
+    if (r.c === 1 || r.c === true) out.c = 1;
     return out;
   }
 

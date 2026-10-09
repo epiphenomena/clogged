@@ -165,6 +165,8 @@
     nextColors: C.randomColors(),
     level: 0,
     startLevel: Store.get('startLevel', 0),
+    challengePick: Store.get('challenge', false) === true,  // the menu toggle
+    challenge: false,     // the mode of the run being played
     score: 0,
     best: Store.get('best', 0),
     chain: 0,
@@ -1127,7 +1129,8 @@
       elapsed: S.levelElapsed,
       pressure: S.pressure,
       locks: S.locks,
-      recorded: S.recorded
+      recorded: S.recorded,
+      challenge: S.challenge
     }));
   }
 
@@ -1149,6 +1152,7 @@
     S.lastRunAt = Date.now();
     var run = { s: S.score, l: S.level, t: S.lastRunAt };
     if (won) run.w = 1;
+    if (S.challenge) run.c = 1;
     history = Sc.add(history, run);
     Store.set('history', history);
   }
@@ -1163,7 +1167,7 @@
     // keeps the same run going, so it must not file one.
     if (!keepScore) { endRun(); S.recorded = false; }
     S.level = Math.max(0, Math.min(C.MAX_LEVEL, level));
-    var built = C.seedLevel(S.level);
+    var built = C.seedLevel(S.level, Math.random, S.challenge);
     S.board = built.board;
     S.pending = built.pending;
     layout();      // the pipe may be a different size at this level
@@ -1179,7 +1183,7 @@
     S.pressure = 0;
     S.locks = 0;
     S.hint = 1;
-    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level));
+    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level, S.challenge));
     hideAllOverlays();
     spawn();
     announce(S.level);
@@ -1189,13 +1193,13 @@
   // The level where something new turns up says so as it opens.
   function announce(level) {
     if (level === C.MATTED_FROM) toast('MATTED CLOGS', '#ffdf9a');
-    else if (level === C.FOURTH_FROM) toast('A FOURTH COLOUR', PALETTE[3].light);
+    else if (level === C.fourthFrom(S.challenge)) toast('A FOURTH COLOUR', PALETTE[3].light);
     else if (level === C.FIFTH_FROM) toast('A FIFTH COLOUR', PALETTE[4].light);
   }
 
   function spawn() {
     S.piece = C.spawnPiece(S.board, S.nextColors);
-    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level));
+    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level, S.challenge));
     drawNext();
     S.fallTimer = 0;
     S.lockPending = false;
@@ -1229,7 +1233,7 @@
     refreshHUD();
     $('clear-info').textContent = 'Level ' + S.level + ' flushed · Score ' + S.score;
     $('clear-next').textContent = 'Up next: level ' + (S.level + 1);
-    $('clear-story').textContent = Q.quipFor(S.level + 1, C);
+    $('clear-story').textContent = Q.quipFor(S.level + 1, C, S.challenge);
     startFx('flush', 'ov-clear');
   }
 
@@ -1294,7 +1298,7 @@
   function afterSettle() {
     var hits = C.findMatches(S.board);
     if (hits.size) { beginClear(hits); return; }
-    if (S.pending.length && S.sinceDrip >= C.dripEvery(S.level) && startDrip()) return;
+    if (S.pending.length && S.sinceDrip >= C.dripEvery(S.level, S.challenge) && startDrip()) return;
     if (clogsLeft() === 0) { levelCleared(); return; }
     spawn();
   }
@@ -1353,7 +1357,7 @@
       if (S.hint > 0) S.hint = Math.max(0, S.hint - dt / 9000);
 
       S.fallTimer += dt;
-      if (S.fallTimer >= C.fallInterval(S.level, S.levelElapsed, rows())) {
+      if (S.fallTimer >= C.fallInterval(S.level, S.levelElapsed, rows(), S.challenge)) {
         S.fallTimer = 0;
         stepFall();
       }
@@ -1694,7 +1698,9 @@
       return '<tr' + mine + '>'
         + '<td class="rank">' + (i + 1) + '</td>'
         + '<td class="score">' + esc(fmtNum(r.s)) + '</td>'
-        + '<td>' + esc(r.l) + (r.w ? trophyBadge(r.s) : '') + '</td>'
+        + '<td>' + esc(r.l) + (r.w ? trophyBadge(r.s) : '')
+        + (r.c ? ' <span class="chal" title="Challenge mode" aria-label="challenge mode">C</span>' : '')
+        + '</td>'
         + '<td class="when">' + esc(fmtDate(r.t)) + '</td>'
         + '</tr>';
     }).join('');
@@ -1876,6 +1882,7 @@
     S.pressure = saved.pressure;
     S.locks = saved.locks;
     S.recorded = saved.recorded;
+    S.challenge = saved.challenge;
     S.chain = 0;
     S.clearSet = null;
     S.drip = null;
@@ -1905,8 +1912,10 @@
   function updateLevelPicker() {
     var d = C.dimsFor(S.startLevel);
     $('lv-num').textContent = 'Level ' + S.startLevel;
-    $('lv-clogs').textContent = C.clogTotal(S.startLevel) + ' clogs · ' + d.w + '×' + d.h
-      + ' · ' + C.colorsFor(S.startLevel) + ' colours';
+    $('lv-clogs').textContent = C.clogTotal(S.startLevel, S.challengePick) + ' clogs · '
+      + d.w + '×' + d.h + ' · ' + C.colorsFor(S.startLevel, S.challengePick) + ' colours';
+    var ch = $('btn-challenge');
+    ch.setAttribute('aria-pressed', S.challengePick ? 'true' : 'false');
     $('menu-best').textContent = 'Best: ' + S.best;
   }
 
@@ -1914,7 +1923,7 @@
   // size further up the levels is visible before you commit to it.
   function previewLevel() {
     if (S.phase !== 'menu') return;
-    var built = C.seedLevel(S.startLevel);
+    var built = C.seedLevel(S.startLevel, Math.random, S.challengePick);
     S.board = built.board;
     S.pending = built.pending;
     layout();
@@ -1951,8 +1960,18 @@
     previewLevel();
   });
 
+  // Four colours from level 1. It applies to the next new game; a suspended
+  // run keeps the mode it was started in.
+  $('btn-challenge').addEventListener('click', function () {
+    S.challengePick = !S.challengePick;
+    Store.set('challenge', S.challengePick);
+    updateLevelPicker();
+    previewLevel();
+  });
+
   $('btn-start').addEventListener('click', function () {
     Sound.unlock();
+    S.challenge = S.challengePick;
     startLevel(S.startLevel, false);   // ends any suspended run, clearing its save
   });
   $('btn-resume-saved').addEventListener('click', function () {
@@ -2054,7 +2073,7 @@
 
   syncSoundButton();
   refreshResumeButton();   // offer a suspended game straight away, if one is waiting
-  S.board = C.seedLevel(S.startLevel).board;
+  S.board = C.seedLevel(S.startLevel, Math.random, S.challengePick).board;
   updateLevelPicker();
   refreshHUD();
   layout();

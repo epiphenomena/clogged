@@ -13,8 +13,9 @@
   'use strict';
 
   // Keyed by the level about to be played. Core is passed in rather than
-  // required so the numbers can never drift from the rules.
-  function storyFor(C) {
+  // required so the numbers can never drift from the rules. In challenge mode
+  // the cat has already moved in when the story starts.
+  function storyFor(C, challenge) {
     var s = {};
     s[1] = 'You are the plumber on call for the Pipers, a family of five with ' +
       'one bathroom and no shame. Their drain is packed solid. Line up four ' +
@@ -27,9 +28,15 @@
     s[C.MATTED_FROM] = 'Congratulations — the Pipers have a new baby! Somebody ' +
       'thinks the wipes are flushable. Matted clogs come wrapped up tight: ' +
       'the first line only unwraps them, the second flushes them.';
-    s[C.FOURTH_FROM] = 'The Pipers just got a cat, and someone swears the ' +
-      'litter is flushable. Red clogs join the party. It is a lot to take in, ' +
-      'so things slow down for a few levels while you get your bearings.';
+    if (!challenge) {
+      s[C.FOURTH_FROM] = 'The Pipers just got a cat, and someone swears the ' +
+        'litter is flushable. Red clogs join the party. It is a lot to take in, ' +
+        'so things slow down for a few levels while you get your bearings.';
+    } else {
+      s[1] += ' Oh, and they just got a cat. Someone swears the litter is ' +
+        'flushable, so this is challenge mode: four colours of clog from the ' +
+        'start. Things ease off for a level or two while you settle in.';
+    }
     s[C.FIFTH_FROM] = 'Grandpa moved in. So did his denture tablets, his ' +
       'prune juice and his opinions. Blue clogs, everyone. Things ease off ' +
       'for a few levels while you adjust to the new normal.';
@@ -70,8 +77,8 @@
     'Spicy curry night. The pipes will remember this.'
   ];
 
-  function quipFor(level, C) {
-    var story = storyFor(C)[level];
+  function quipFor(level, C, challenge) {
+    var story = storyFor(C, challenge)[level];
     if (story) return story;
     return POOL[Math.abs(level || 0) % POOL.length];
   }

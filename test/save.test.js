@@ -222,6 +222,20 @@ function sampleGame() {
   eq('encoding does not alias the game it was given', JSON.stringify(g), snapshot);
 }
 
+// The mode travels with the snapshot; saves from before it existed are normal.
+{
+  const g = sampleGame();
+  g.challenge = true;
+  const back = S.decode(S.encode(g), LIMITS);
+  eq('a challenge game stays one', back.challenge, true);
+  eq('and says so when offered for resume', /^Challenge · /.test(S.describe(back)), true);
+  const plain = S.decode(S.encode(sampleGame()), LIMITS);
+  eq('a normal game stays normal', plain.challenge, false);
+  const old = S.encode(sampleGame());
+  delete old.c;
+  eq('a save without the mode is a normal game', S.decode(old, LIMITS).challenge, false);
+}
+
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');
   failures.forEach((f) => console.error('  ✗ ' + f));

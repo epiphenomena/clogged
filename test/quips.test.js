@@ -25,5 +25,12 @@ check('the fifth colour gets its own story',
 check('the pool has no repeats', new Set(Q.POOL).size === Q.POOL.length);
 check('a level always says the same thing', Q.quipFor(23, C) === Q.quipFor(23, C));
 
+// Challenge mode: the cat is there from the start, so level 20 is ordinary.
+check('a challenge game opens with the premise and the cat',
+  /plumber/.test(Q.quipFor(1, C, true)) && /cat\b/.test(Q.quipFor(1, C, true)));
+check('a challenge game does not bring the cat in twice',
+  !/cat\b/.test(Q.quipFor(C.FOURTH_FROM, C, true)));
+check('the normal game keeps its story', Q.quipFor(1, C) === Q.quipFor(1, C, false));
+
 if (failed) { console.error(failed + ' failed'); process.exit(1); }
 console.log('ok — ' + passed + ' assertions passed');

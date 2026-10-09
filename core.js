@@ -37,6 +37,9 @@
   var COLORS = 5;
   var FOURTH_FROM = 20;
   var FIFTH_FROM = 32;
+  // Challenge mode deals the fourth colour from level 1 instead. Every rule
+  // that depends on the colour count takes the mode as its last argument.
+  var CHALLENGE_FOURTH_FROM = 1;
   var MIN_RUN = 4;
   var MAX_LEVEL = 50;   // flushing this one wins the game
   // Pressure is meant to punish stalling, not ordinary play. Nothing happens at
@@ -366,9 +369,13 @@
     return { c: (dims(board).w >> 1) - 1, r: 0, orient: 0, colors: colors };
   }
 
-  function colorsFor(level) {
+  function fourthFrom(challenge) {
+    return challenge ? CHALLENGE_FOURTH_FROM : FOURTH_FROM;
+  }
+
+  function colorsFor(level, challenge) {
     var l = level || 0;
-    return l >= FIFTH_FROM ? 5 : l >= FOURTH_FROM ? 4 : BASE_COLORS;
+    return l >= FIFTH_FROM ? 5 : l >= fourthFrom(challenge) ? 4 : BASE_COLORS;
   }
 
   function randomColors(rand, colors) {
@@ -413,18 +420,18 @@
   var EASE_FALL = 0.3;      // up to 30% slower fall
   var EASE_DRIP = 0.5;      // from this much ease, one more coupling between arrivals
 
-  function introductions() {
+  function introductions(challenge) {
     return [
       { from: MATTED_FROM, weight: 0.5 },
-      { from: FOURTH_FROM, weight: 1 },
+      { from: fourthFrom(challenge), weight: 1 },
       { from: FIFTH_FROM, weight: 1 }
     ];
   }
 
   // 0 on an ordinary level, up to 1 on the one that brings in a new colour.
-  function easeFor(level) {
+  function easeFor(level, challenge) {
     var l = level || 0, best = 0;
-    introductions().forEach(function (it) {
+    introductions(challenge).forEach(function (it) {
       if (l < it.from) return;
       var e = it.weight * Math.max(0, 1 - (l - it.from) / EASE_LEVELS);
       if (e > best) best = e;
@@ -434,9 +441,9 @@
 
   // The whole quota for a level, seeded and dripped together. This used to add
   // four per level up to 64, which outran the player badly.
-  function clogTotal(level) {
+  function clogTotal(level, challenge) {
     var l = Math.max(0, level || 0);
-    return Math.round(Math.min(4 + l * 2, 40) * (1 - EASE_CLOGS * easeFor(l)));
+    return Math.round(Math.min(4 + l * 2, 40) * (1 - EASE_CLOGS * easeFor(l, challenge)));
   }
 
   // How much of the quota is already wedged in when the level opens. The share
@@ -446,16 +453,17 @@
   var SEED_SHARE_PER_LEVEL = 0.05;
   var SEED_SHARE_MIN = 0.35;
 
-  function clogSeedCount(level) {
-    var total = clogTotal(level);
+  function clogSeedCount(level, challenge) {
+    var total = clogTotal(level, challenge);
     var share = Math.max(SEED_SHARE_MIN,
       SEED_SHARE_BASE - Math.max(0, level || 0) * SEED_SHARE_PER_LEVEL);
     return Math.max(2, Math.min(total, Math.round(total * share)));
   }
 
   // Couplings landed between one arrival and the next.
-  function dripEvery(level) {
-    return Math.max(2, 4 - Math.floor(level / 8)) + (easeFor(level) >= EASE_DRIP ? 1 : 0);
+  function dripEvery(level, challenge) {
+    return Math.max(2, 4 - Math.floor(level / 8)) +
+      (easeFor(level, challenge) >= EASE_DRIP ? 1 : 0);
   }
 
   function shuffle(list, rand) {
@@ -589,13 +597,13 @@
   // Builds a level: the pipe it is played on, the clogs wedged in at the start,
   // and the queue of those still to wash down. Nothing is placed 3-in-a-line, or
   // the level would cascade on its own the instant it opens.
-  function seedLevel(level, rand) {
+  function seedLevel(level, rand, challenge) {
     rand = rand || Math.random;
     var board = makeBoardFor(level);
     var W = board.w, H = board.h;
-    var colors = colorsFor(level);
-    var quota = balancedColors(clogTotal(level), rand, colors);
-    var seedN = Math.min(quota.length, clogSeedCount(level));
+    var colors = colorsFor(level, challenge);
+    var quota = balancedColors(clogTotal(level, challenge), rand, colors);
+    var seedN = Math.min(quota.length, clogSeedCount(level, challenge));
 
     var want = [];
     for (var z = 0; z < colors; z++) want.push(0);
@@ -665,10 +673,10 @@
   // Milliseconds per row of free fall. A taller pipe gets a shorter interval,
   // so a coupling takes about the same time to cross the screen whatever size
   // the fittings are: the rows are smaller, not slower.
-  function fallInterval(level, elapsedMs, h) {
+  function fallInterval(level, elapsedMs, h, challenge) {
     var base = Math.max(FALL_FLOOR_MS,
       FALL_BASE_MS - Math.max(0, level || 0) * FALL_PER_LEVEL_MS) *
-      (1 + EASE_FALL * easeFor(level));
+      (1 + EASE_FALL * easeFor(level, challenge));
     var scaled = base * (BASE_H / (h || BASE_H));
     return scaled * Math.pow(PRESSURE_FACTOR, pressureStep(level, elapsedMs));
   }
@@ -698,6 +706,7 @@
     TROPHIES: TROPHIES, trophyFor: trophyFor,
     BASE_W: BASE_W, BASE_H: BASE_H, MAX_W: MAX_W, MAX_H: MAX_H,
     COLORS: COLORS, BASE_COLORS: BASE_COLORS, FOURTH_FROM: FOURTH_FROM, FIFTH_FROM: FIFTH_FROM, colorsFor: colorsFor,
+    CHALLENGE_FOURTH_FROM: CHALLENGE_FOURTH_FROM, fourthFrom: fourthFrom,
     MIN_RUN: MIN_RUN, MAX_LEVEL: MAX_LEVEL,
     DIRS: DIRS, OFFSETS: OFFSETS, LINKS: LINKS, OPPOSITE: OPPOSITE,
     dimsFor: dimsFor, dims: dims,

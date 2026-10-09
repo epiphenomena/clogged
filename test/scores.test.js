@@ -129,6 +129,16 @@ const run = (s, t, l) => ({ s, t: t || 0, l: l || 0 });
   check('a junk marker is dropped', !('w' in junk.runs[0]));
 }
 
+/* ------------------------------------------------------- challenge runs */
+{
+  const st = S.add(S.empty(), { s: 9000, l: 6, t: 5, c: 1 });
+  eq('a challenge run keeps its marker', st.runs[0].c, 1);
+  eq('in the top table too', st.top[0].c, 1);
+  check('an ordinary run carries no challenge marker', !('c' in S.add(S.empty(), run(100, 3)).runs[0]));
+  check('a junk challenge marker is dropped',
+    !('c' in S.sanitize({ runs: [{ s: 10, l: 1, t: 1, c: 'yes' }], top: [] }).runs[0]));
+}
+
 /* ---------------------------------------------------------------- report */
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');

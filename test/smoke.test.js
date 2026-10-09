@@ -290,10 +290,10 @@ const _seed = C.seedLevel;
 // Set to a level number to have that level open with nothing in the pipe, so
 // the top of the game can be reached without playing fifty levels.
 let emptyFrom = Infinity;
-C.seedLevel = function (level, rand) {
+C.seedLevel = function (level, rand, challenge) {
   const built = level >= emptyFrom && !simulating
     ? { board: C.makeBoardFor(level), pending: [] }
-    : _seed(level, rand);
+    : _seed(level, rand, challenge);
   if (!simulating) liveBoard = built.board;
   return built;
 };
@@ -1086,6 +1086,52 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   pick(C.FIFTH_FROM);
   check('the level picker says how many colours a level uses',
     / 5 colours$/.test(el('lv-clogs').textContent), el('lv-clogs').textContent);
+
+  // Challenge mode: the fourth colour from level 1, remembered, and carried
+  // by the run rather than by whatever the menu says later.
+  check('challenge mode starts off', el('btn-challenge').getAttribute('aria-pressed') === 'false');
+  el('btn-challenge').fire('click');
+  check('the toggle shows it is on', el('btn-challenge').getAttribute('aria-pressed') === 'true');
+  check('the toggle is remembered', store.get('clogged.challenge') === 'true',
+    String(store.get('clogged.challenge')));
+  pick(1);
+  check('the picker counts four colours at level 1 in challenge mode',
+    / 4 colours$/.test(el('lv-clogs').textContent), el('lv-clogs').textContent);
+  pick(0);
+  check('level 0 keeps three colours in challenge mode',
+    / 3 colours$/.test(el('lv-clogs').textContent), el('lv-clogs').textContent);
+  const chal = coloursDealtAt(1);
+  check('challenge mode deals the fourth colour on level 1', chal.has(3) && !chal.has(4),
+    [...chal].join(','));
+
+  startAt(1);
+  tick(16);
+  const snap = JSON.parse(store.get('clogged.save'));
+  check('a challenge run is saved as one', snap.c === 1, JSON.stringify(snap.c));
+  el('btn-pause').fire('click');
+  el('btn-new-game').fire('click');     // files the run
+  const hist = JSON.parse(store.get('clogged.history'));
+  const last = hist.runs[hist.runs.length - 1];
+  check('a challenge run is filed as one', !last || last.s === 0 || last.c === 1, JSON.stringify(last));
+
+  // A suspended challenge run resumes in challenge mode with the menu off.
+  store.set('clogged.save', JSON.stringify(snap));
+  el('btn-challenge').fire('click');
+  check('the toggle turns back off', el('btn-challenge').getAttribute('aria-pressed') === 'false');
+  const described = Sv.describe(Sv.decode(snap,
+    { maxW: C.MAX_W, maxH: C.MAX_H, colors: C.COLORS, maxLevel: C.MAX_LEVEL }));
+  check('the resume button names the mode', /^Challenge · Level 1/.test(described), described);
+  el('btn-resume-saved').fire('click');
+  const resumed = new Set();
+  for (let i = 0; i < 3000 && resumed.size < 4 && !visible('ov-gameover') && !visible('ov-clear'); i++) {
+    if (pendingSpawn) { pendingSpawn = false; liveColors.forEach((c) => resumed.add(c)); }
+    if (i % 4 === 0) global.document.fire('keydown', { key: ' ' });
+    tick(16);
+  }
+  check('a resumed challenge run keeps its fourth colour', resumed.has(3), [...resumed].join(','));
+  if (visible('ov-gameover')) el('btn-menu').fire('click');
+  else if (visible('ov-clear')) { el('btn-next-level').fire('click'); el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
+  else { el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
 }
 
 /* ------------------------------------------------------ winning the game */

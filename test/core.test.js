@@ -724,6 +724,33 @@ function lcg(seed) {
     && C.trophyFor(663000) === 'gold');
 }
 
+/* -------------------------------------------------------- challenge mode */
+{
+  eq('challenge mode leaves level 0 at three colours', C.colorsFor(0, true), 3);
+  eq('challenge mode has four colours on level 1', C.colorsFor(1, true), 4);
+  eq('challenge mode still waits for the fifth', C.colorsFor(C.FIFTH_FROM - 1, true), 4);
+  eq('and gets it on time', C.colorsFor(C.FIFTH_FROM, true), 5);
+  eq('the normal game is unchanged on level 1', C.colorsFor(1), 3);
+  eq('a falsy mode is the normal game', C.colorsFor(C.FOURTH_FROM - 1, false), 3);
+
+  // The breather follows the colour to wherever it arrives.
+  eq('level 1 gets the full breather in challenge mode', C.easeFor(1, true), 1);
+  check('and fewer clogs than the normal level 1', C.clogTotal(1, true) < C.clogTotal(1),
+    C.clogTotal(1, true) + ' vs ' + C.clogTotal(1));
+  check('a slower fall', C.fallInterval(1, 0, C.BASE_H, true) > C.fallInterval(1, 0, C.BASE_H));
+  check('nothing new turns up at the normal fourth-colour level in challenge mode',
+    C.easeFor(C.FOURTH_FROM, true) < C.easeFor(C.FOURTH_FROM));
+
+  let n = 0;
+  const rand = () => ((n = (n * 1103515245 + 12345) >>> 0) / 4294967296);
+  const seen = new Set();
+  const built = C.seedLevel(1, rand, true);
+  built.board.forEach((c) => c && seen.add(c.color));
+  built.pending.forEach((c) => seen.add(c));
+  check('a challenge level 1 is seeded with the fourth colour', seen.has(3) && !seen.has(4),
+    [...seen].join(','));
+}
+
 /* ---------------------------------------------------------------- report */
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');

@@ -53,7 +53,8 @@
       elapsed: game.elapsed,
       pressure: game.pressure,
       locks: game.locks,
-      recorded: !!game.recorded
+      recorded: !!game.recorded,
+      c: game.challenge ? 1 : 0
     };
   }
 
@@ -137,14 +138,15 @@
       elapsed: elapsed,
       pressure: pressure,
       locks: locks,
-      recorded: !!raw.recorded
+      recorded: !!raw.recorded,
+      challenge: raw.c === 1
     };
   }
 
   // A one-line description for the resume prompt.
   function describe(game) {
     if (!game) return '';
-    return 'Level ' + game.level + ' · score ' + game.score;
+    return (game.challenge ? 'Challenge · ' : '') + 'Level ' + game.level + ' · score ' + game.score;
   }
 
   return { VERSION: VERSION, encode: encode, decode: decode, describe: describe };
