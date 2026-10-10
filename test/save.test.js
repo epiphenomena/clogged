@@ -236,6 +236,19 @@ function sampleGame() {
   eq('a save without the mode is a normal game', S.decode(old, LIMITS).challenge, false);
 }
 
+// The run's plunger tally travels with the snapshot.
+{
+  const g = sampleGame();
+  g.plungers = 7;
+  eq('the plunger tally survives', S.decode(S.encode(g), LIMITS).plungers, 7);
+  const old = S.encode(sampleGame());
+  delete old.pl;
+  eq('a save from before the award starts at none', S.decode(old, LIMITS).plungers, 0);
+  const junk = S.encode(sampleGame());
+  junk.pl = -3;
+  eq('a junk tally is dropped, not the save', S.decode(junk, LIMITS).plungers, 0);
+}
+
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');
   failures.forEach((f) => console.error('  ✗ ' + f));

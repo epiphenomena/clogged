@@ -167,6 +167,7 @@
     startLevel: Store.get('startLevel', 0),
     challengePick: Store.get('challenge', false) === true,  // the menu toggle
     challenge: false,     // the mode of the run being played
+    plungers: 0,          // efficiency awards won so far this run
     score: 0,
     best: Store.get('best', 0),
     chain: 0,
@@ -1130,7 +1131,8 @@
       pressure: S.pressure,
       locks: S.locks,
       recorded: S.recorded,
-      challenge: S.challenge
+      challenge: S.challenge,
+      plungers: S.plungers
     }));
   }
 
@@ -1173,7 +1175,7 @@
     layout();      // the pipe may be a different size at this level
     S.sinceDrip = 0;
     S.drip = null;
-    if (!keepScore) S.score = 0;
+    if (!keepScore) { S.score = 0; S.plungers = 0; }
     S.chain = 0;
     S.clearSet = null;
     S.toast = null;
@@ -1225,10 +1227,31 @@
     startFx('sludge', 'ov-gameover');
   }
 
+  var AWARD_WORDS = ['', 'Flushed.', 'Clean flush!', 'Spotless flush!'];
+
+  // One to three plungers for how few pills the level took. S.locks counts
+  // every coupling landed this level, and survives a suspend and resume.
+  function awardLevel() {
+    var won = C.plungersFor(S.locks, S.level, S.challenge);
+    var par = C.parPills(S.level, S.challenge);
+    S.plungers += won;
+    return { won: won, line: AWARD_WORDS[won] + ' ' + S.locks + ' pills · par ' + par };
+  }
+
+  function showAward(award) {
+    var box = $('clear-award');
+    box.setAttribute('data-earned', String(award.won));
+    box.setAttribute('aria-label', award.won + ' of 3 plungers');
+    $('clear-award-line').textContent = award.line;
+    if (award.won === 3) Sound.fanfare();
+  }
+
   function levelCleared() {
     S.phase = 'levelclear';
     S.score += 500 * (S.level + 1);
-    if (S.level >= C.MAX_LEVEL) { wonGame(); return; }
+    var award = awardLevel();
+    if (S.level >= C.MAX_LEVEL) { wonGame(award); return; }
+    showAward(award);
     saveBest();  // mid-run: bank the best, but the run is not over
     refreshHUD();
     $('clear-info').textContent = 'Level ' + S.level + ' flushed · Score ' + S.score;
@@ -1240,7 +1263,7 @@
   // The last level is flushed: the run is over and it is filed as a win. The
   // game stops here rather than starting over, and hands out a plunger whose
   // metal is set by the final score.
-  function wonGame() {
+  function wonGame(award) {
     S.phase = 'won';
     S.piece = null;
     endRun(true);
@@ -1251,6 +1274,8 @@
     $('win-metal').textContent = metal.charAt(0).toUpperCase() + metal.slice(1) + ' plunger';
     $('win-score').textContent = 'Score: ' + fmtNum(S.score);
     $('win-best').textContent = S.score >= S.best ? 'A new best!' : 'Best: ' + fmtNum(S.best);
+    $('win-plungers').textContent = S.plungers + ' efficiency plungers this run'
+      + (award ? ' · ' + award.won + ' on the last level' : '');
     startFx('plunger', 'ov-win');
   }
 
@@ -1883,6 +1908,7 @@
     S.locks = saved.locks;
     S.recorded = saved.recorded;
     S.challenge = saved.challenge;
+    S.plungers = saved.plungers;
     S.chain = 0;
     S.clearSet = null;
     S.drip = null;

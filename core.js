@@ -681,6 +681,31 @@
     return scaled * Math.pow(PRESSURE_FACTOR, pressureStep(level, elapsedMs));
   }
 
+  /* ------------------------------------------------------------- efficiency */
+
+  // Each level awards one to three plungers for how few pills it took. Par is
+  // a generous guess at a tidy clear: two and a half pills a clog with three
+  // colours, more with each colour added (the right half turns up less often),
+  // a second line for the share of clogs that come matted, and a little slack.
+  // The layouts are random, so the bands are wide: three plungers at or under
+  // par, two up to twice par, and one for any clear at all.
+  var PAR_PILLS_PER_CLOG = 2.5;
+  var PAR_SLACK = 3;
+  var PAR_TWO_PLUNGERS = 2;   // times par
+
+  function parPills(level, challenge) {
+    var work = clogTotal(level, challenge) * (1 + mattedShare(level));
+    return Math.round(work * PAR_PILLS_PER_CLOG *
+      colorsFor(level, challenge) / BASE_COLORS + PAR_SLACK);
+  }
+
+  function plungersFor(pills, level, challenge) {
+    var par = parPills(level, challenge);
+    if (pills <= par) return 3;
+    if (pills <= par * PAR_TWO_PLUNGERS) return 2;
+    return 1;
+  }
+
   /* ---------------------------------------------------------------- trophy */
 
   // Flushing the last level wins a golden plunger — or a bronze one, or better
@@ -722,6 +747,7 @@
     clogSeedCount: clogSeedCount, dripEvery: dripEvery, balancedColors: balancedColors,
     dripLanding: dripLanding, dripColumn: dripColumn, placeClog: placeClog,
     dripTarget: dripTarget,
+    parPills: parPills, plungersFor: plungersFor,
     easeFor: easeFor, introductions: introductions, EASE_LEVELS: EASE_LEVELS,
     mattedShare: mattedShare, rollMatted: rollMatted, MATTED_FROM: MATTED_FROM, dripSnagRows: dripSnagRows, snagMinRow: snagMinRow,
     DRIP_SNAG_CHANCE: DRIP_SNAG_CHANCE,

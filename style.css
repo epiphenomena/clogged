@@ -194,6 +194,34 @@ body {
 
 .howto b { color: var(--text); font-weight: 700; }
 
+/* Efficiency award: three plunger slots, the earned ones in gold and popped
+   in one after another, the rest left as outlines. */
+.award { display: flex; justify-content: center; gap: 10px; margin: 12px 0 4px; }
+.award-plunger {
+  width: 24px;
+  height: 32px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  opacity: 0.45;
+}
+.award[data-earned="1"] .award-plunger:nth-child(-n+1),
+.award[data-earned="2"] .award-plunger:nth-child(-n+2),
+.award[data-earned="3"] .award-plunger:nth-child(-n+3) {
+  fill: #f5c542;
+  stroke: #a16207;
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(245, 197, 66, 0.45));
+  animation: award-pop 0.4s cubic-bezier(.3, 1.6, .5, 1) backwards;
+}
+.award .award-plunger:nth-child(2) { animation-delay: 0.25s; }
+.award .award-plunger:nth-child(3) { animation-delay: 0.5s; }
+@keyframes award-pop { from { transform: scale(0.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .award .award-plunger { animation: none; }
+}
+.award-line { margin: 0 0 4px; font-size: 13px; color: var(--muted); }
+
 /* Short phones: the title screen holds a resume button, the level picker and
    the challenge switch, so it gives back some air to stay on one screen. */
 @media (max-height: 700px) {

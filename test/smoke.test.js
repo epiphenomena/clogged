@@ -282,6 +282,10 @@ C.dropDistance = function (board, piece) {
   return _dropDistance(board, piece);
 };
 let lastRotateDir = 0;
+// The colour count the game last dealt couplings from.
+let lastDealFrom = null;
+const _randomColors = C.randomColors;
+C.randomColors = function (rand, colors) { lastDealFrom = colors; return _randomColors(rand, colors); };
 const _rotate = C.tryRotate;
 C.tryRotate = function (board, piece, dir) { lastRotateDir = dir; return _rotate(board, piece, dir); };
 // Catch the board the moment a level is built, so it is accurate before the
@@ -466,6 +470,10 @@ check('level clear names the level', /Level 0 flushed/.test(el('clear-info').tex
 check('the screen before level 1 tells the story',
   /plumber/.test(el('clear-story').textContent) && /level 1/.test(el('clear-next').textContent),
   el('clear-next').textContent + ' / ' + el('clear-story').textContent);
+const earned = Number(el('clear-award').getAttribute('data-earned'));
+check('clearing a level awards one to three plungers', earned >= 1 && earned <= 3, String(earned));
+check('the award says how many pills it took against par',
+  /\d+ pills · par \d+/.test(el('clear-award-line').textContent), el('clear-award-line').textContent);
 check('best score persisted', store.has('clogged.best'), [...store.keys()].join(','));
 check('the HUD steps aside for the flush effect',
   global.document.body.classes.has('fx-active'));
@@ -1122,13 +1130,13 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
     { maxW: C.MAX_W, maxH: C.MAX_H, colors: C.COLORS, maxLevel: C.MAX_LEVEL }));
   check('the resume button names the mode', /^Challenge · Level 1/.test(described), described);
   el('btn-resume-saved').fire('click');
-  const resumed = new Set();
-  for (let i = 0; i < 3000 && resumed.size < 4 && !visible('ov-gameover') && !visible('ov-clear'); i++) {
-    if (pendingSpawn) { pendingSpawn = false; liveColors.forEach((c) => resumed.add(c)); }
+  if (visible('ov-pause')) el('btn-resume').fire('click');
+  lastDealFrom = null;
+  for (let i = 0; i < 400 && lastDealFrom === null && !visible('ov-gameover') && !visible('ov-clear'); i++) {
     if (i % 4 === 0) global.document.fire('keydown', { key: ' ' });
     tick(16);
   }
-  check('a resumed challenge run keeps its fourth colour', resumed.has(3), [...resumed].join(','));
+  check('a resumed challenge run keeps dealing four colours', lastDealFrom === 4, String(lastDealFrom));
   if (visible('ov-gameover')) el('btn-menu').fire('click');
   else if (visible('ov-clear')) { el('btn-next-level').fire('click'); el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
   else { el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }

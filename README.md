@@ -82,6 +82,15 @@ multiplier, up to 16×.
 Each level's colours are dealt out evenly, so no single colour can run away with
 a board and strand the others.
 
+Every level also awards **one to three plungers** for efficiency, judged by
+how many pills (couplings) it took against a par for that level. Par is a
+generous guess at a tidy clear: two and a half pills a clog with three colours,
+scaled up for each extra colour and for the share of clogs that come matted,
+plus a little slack. Three plungers at or under par, two up to twice par, one
+for any clear. The bands are wide on purpose, since the layouts are random;
+the constants in `core.js` (`PAR_*`) are the knobs. The run's tally is shown
+when the game is won.
+
 ## Winning
 
 There are 51 levels, 0 to 50. Flush level 50 and the game is won: the run is

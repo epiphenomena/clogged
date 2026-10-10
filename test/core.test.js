@@ -751,6 +751,28 @@ function lcg(seed) {
     [...seen].join(','));
 }
 
+/* ------------------------------------------------------- efficiency award */
+{
+  for (let level = 0; level <= C.MAX_LEVEL; level++) {
+    const par = C.parPills(level);
+    if (C.plungersFor(par, level) !== 3 || C.plungersFor(par + 1, level) !== 2 ||
+        C.plungersFor(par * 2, level) !== 2 || C.plungersFor(par * 2 + 1, level) !== 1) {
+      check('level ' + level + ' awards by par bands', false, 'par=' + par);
+    }
+  }
+  eq('a perfect level earns three', C.plungersFor(0, 0), 3);
+  eq('any clear earns at least one', C.plungersFor(1e6, C.MAX_LEVEL), 1);
+  check('par allows more than a pill and a half a clog, since layouts are random',
+    C.parPills(0) >= C.clogTotal(0) * 2, C.parPills(0) + ' for ' + C.clogTotal(0));
+  check('a new colour raises par at the same clog count',
+    C.parPills(C.FOURTH_FROM) / C.clogTotal(C.FOURTH_FROM) >
+      C.parPills(C.FOURTH_FROM - 4) / C.clogTotal(C.FOURTH_FROM - 4));
+  check('matted clogs raise par', C.parPills(C.MATTED_FROM + 5) / C.clogTotal(C.MATTED_FROM + 5) >
+    C.parPills(C.MATTED_FROM - 1) / C.clogTotal(C.MATTED_FROM - 1));
+  check('challenge mode prices in its fourth colour',
+    C.parPills(2, true) / C.clogTotal(2, true) > C.parPills(2) / C.clogTotal(2));
+}
+
 /* ---------------------------------------------------------------- report */
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');

@@ -54,7 +54,8 @@
       pressure: game.pressure,
       locks: game.locks,
       recorded: !!game.recorded,
-      c: game.challenge ? 1 : 0
+      c: game.challenge ? 1 : 0,
+      pl: game.plungers || 0
     };
   }
 
@@ -139,7 +140,9 @@
       pressure: pressure,
       locks: locks,
       recorded: !!raw.recorded,
-      challenge: raw.c === 1
+      challenge: raw.c === 1,
+      // Older saves predate the efficiency award, so they start the tally at 0.
+      plungers: isInt(raw.pl, 0, 3 * (limits.maxLevel + 1)) ? raw.pl : 0
     };
   }
 
