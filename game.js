@@ -1227,6 +1227,16 @@
     startFx('sludge', 'ov-gameover');
   }
 
+  // A random line about the coming level, skipping the last dozen shown so a
+  // long run does not hear the same joke twice in a row.
+  var recentQuips = [];
+  function nextQuip(level) {
+    var line = Q.quipFor(level, C, S.challenge, Math.random, recentQuips);
+    recentQuips.push(line);
+    if (recentQuips.length > 12) recentQuips.shift();
+    return line;
+  }
+
   var AWARD_WORDS = ['', 'Flushed.', 'Clean flush!', 'Spotless flush!'];
 
   // One to three plungers for how few pills the level took. S.locks counts
@@ -1256,7 +1266,7 @@
     refreshHUD();
     $('clear-info').textContent = 'Level ' + S.level + ' flushed · Score ' + S.score;
     $('clear-next').textContent = 'Up next: level ' + (S.level + 1);
-    $('clear-story').textContent = Q.quipFor(S.level + 1, C, S.challenge);
+    $('clear-story').textContent = nextQuip(S.level + 1);
     startFx('flush', 'ov-clear');
   }
 

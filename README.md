@@ -238,7 +238,7 @@ with no DOM access, so they can be tested directly:
 node test/core.test.js    # board rules
 node test/scores.test.js  # score history
 node test/save.test.js    # suspended-game snapshots
-node test/quips.test.js   # the level-clear story lines
+node test/quips.test.js   # the level-clear jokes and story lines
 node test/smoke.test.js   # boots the real game.js against a stubbed DOM and plays it
 ```
 
