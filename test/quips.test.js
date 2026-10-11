@@ -62,7 +62,7 @@ every(S[C.SNAKE_FROM], [/snake/, /chain of three/, /once a level/, /column/, /fi
   'the drain snake arrives with its rule');
 every(S[C.CHROME_FROM], [/chrome/, /any colour/], 'chrome arrives with its rule');
 every(SC[C.CHROME_FROM], [/chrome/, /any colour/], 'chrome arrives in challenge mode too');
-every(S[C.DYE_FROM], [/teenager/, /dye/i, /change/, /ring/, /puls/], 'dyed clogs arrive with their rule');
+every(S[C.DYE_FROM], [/teenager/, /dye/i, /change/, /now/, /pips/, /streak/, /flash/], 'dyed clogs arrive with their rule');
 every(S[C.MATTED_FROM], [/baby/, /wipes/, /first/, /unwrap/, /second/, /flush/],
   'the matted clogs arrive with the baby');
 every(S[C.FOURTH_FROM], [/\bcat\b/, /new colour/, /(ease|slow)/, /few levels/],

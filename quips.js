@@ -99,16 +99,16 @@
     ];
     s[C.DYE_FROM] = [
       'The Pipers\' teenager dyes their hair a new colour every week, and ' +
-        'every week it goes down the drain. Dyed clogs change colour every ' +
-        'few couplings: the ring shows the colour to come, and it pulses ' +
-        'just before the change.',
+        'every week it goes down the drain. A dyed clog matches the colour ' +
+        'it is now; its white pips count the couplings until it changes, ' +
+        'and a streak of the new colour flashes just before.',
       'Hair dye season. The teenager rinses out a new colour every week. ' +
-        'A dyed clog swaps colour every few couplings; its ring shows what ' +
-        'it turns into, and pulses when the change is next.',
+        'Match a dyed clog by the colour it is now. The pips count down ' +
+        'the couplings to its change; a flashing streak shows what is next.',
       'The teenager went from blonde to "sunset" to "galaxy" in a month, ' +
         'all of it via the drain. Dyed clogs change colour every few ' +
-        'couplings. Watch the ring: it is the colour coming next, and it ' +
-        'pulses when the change is due.'
+        'couplings. Go by the colour they are now, count the pips, and ' +
+        'watch for the flashing streak of the colour to come.'
     ];
     s[C.MATTED_FROM] = [
       'Congratulations — the Pipers have a new baby! Somebody ' +

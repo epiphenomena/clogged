@@ -775,21 +775,43 @@
     ctx.restore();
   }
 
-  // A dyed clog's warning: a solid ring in the colour it turns next, which
-  // throbs on the last coupling before the change. Solid, so it never reads as
-  // a matted clog's braided collar, which is dashed and in the clog's own colour.
-  function dyeRing(ctx, x, y, s, next, soon) {
-    var P = PALETTE[next];
-    var cx = x + s / 2, cy = y + s / 2;
-    var throb = soon && !reduceMotion ? 0.5 + 0.5 * Math.sin(glintT * 0.012) : 0;
+  // A dyed clog shows only the colour it is now, so there is one colour to
+  // match. White pips count the couplings left before it changes; on the
+  // last one a streak of the colour to come flashes across it.
+  function dyeMark(ctx, x, y, s, next, left) {
+    var cx = x + s / 2;
+    var n = Math.max(1, Math.min(C.DYE_EVERY, left));
+    var r = Math.max(1.5, s * 0.075), gap = r * 2.7;
     ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(1.5, s * (0.09 + throb * 0.04));
-    ctx.strokeStyle = soon ? P.light : P.main;
-    ctx.globalAlpha = soon ? 0.75 + throb * 0.25 : 0.9;
-    ctx.beginPath();
-    ctx.arc(cx, cy, s * 0.42, 0, Math.PI * 2);
-    ctx.stroke();
+    if (left <= 1) {
+      var P = PALETTE[next];
+      var flash = reduceMotion ? 1 : 0.65 + 0.35 * Math.sin(glintT * 0.012);
+      ctx.globalAlpha = flash;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x + s * 0.2, y + s * 0.6);
+      ctx.quadraticCurveTo(cx, y + s * 0.12, x + s * 0.8, y + s * 0.34);
+      ctx.lineWidth = Math.max(3, s * 0.24);
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.stroke();
+      ctx.lineWidth = Math.max(2, s * 0.17);
+      ctx.strokeStyle = P.main;
+      ctx.stroke();
+      ctx.lineWidth = Math.max(1, s * 0.06);
+      ctx.strokeStyle = P.light;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = Math.max(1, s * 0.025);
+    for (var k = 0; k < n; k++) {
+      var px = cx + (k - (n - 1) / 2) * gap;
+      ctx.beginPath();
+      ctx.arc(px, y + s * 0.8, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
     ctx.restore();
   }
   function glint(ctx, x, y, s) {
@@ -847,7 +869,7 @@
         blit(ctx, sprite, x, y, s);
         if (cell.matted) blit(ctx, matSprite(cell.color), x, y, s);
         if (cell.color === C.WILD) glint(ctx, x, y, s);
-        if (cell.dye !== undefined) dyeRing(ctx, x, y, s, cell.dye, cell.dyeIn <= 1);
+        if (cell.dye !== undefined) dyeMark(ctx, x, y, s, cell.dye, cell.dyeIn);
         continue;
       }
 
@@ -962,7 +984,7 @@
 
     blit(ctx, clogSprite(d.color, d.col + d.target), view.x0 + d.col * sz, y, sz);
     if (d.matted) blit(ctx, matSprite(d.color), view.x0 + d.col * sz, y, sz);
-    if (d.dye) dyeRing(ctx, view.x0 + d.col * sz, y, sz, d.dye.color, false);
+    if (d.dye) dyeMark(ctx, view.x0 + d.col * sz, y, sz, d.dye.color, d.dye.inPieces);
   }
 
   function drawToast() {
