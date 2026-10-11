@@ -86,6 +86,19 @@
         'skeleton key. A chrome half matches any colour in its line. They ' +
         'turn up now and again, so save them for the awkward spots.'
     ];
+    s[C.DYE_FROM] = [
+      'The Pipers\' teenager dyes their hair a new colour every week, and ' +
+        'every week it goes down the drain. Dyed clogs change colour every ' +
+        'few couplings: the ring shows the colour to come, and it pulses ' +
+        'just before the change.',
+      'Hair dye season. The teenager rinses out a new colour every week. ' +
+        'A dyed clog swaps colour every few couplings; its ring shows what ' +
+        'it turns into, and pulses when the change is next.',
+      'The teenager went from blonde to "sunset" to "galaxy" in a month, ' +
+        'all of it via the drain. Dyed clogs change colour every few ' +
+        'couplings. Watch the ring: it is the colour coming next, and it ' +
+        'pulses when the change is due.'
+    ];
     s[C.MATTED_FROM] = [
       'Congratulations — the Pipers have a new baby! Somebody ' +
         'thinks the wipes are flushable. Matted clogs come wrapped up tight: ' +

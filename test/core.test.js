@@ -865,6 +865,67 @@ function lcg(seed) {
   }
 }
 
+/* ------------------------------------------------------- hair-dye clogs */
+{
+  eq('no dye before its level', C.dyeShare(C.DYE_FROM - 1), 0);
+  check('some dye from its level', C.dyeShare(C.DYE_FROM) > 0);
+  check('never most clogs', C.dyeShare(C.MAX_LEVEL) <= 0.25);
+  let n = 11;
+  const rand = () => ((n = (n * 1103515245 + 12345) >>> 0) / 4294967296);
+
+  // Seeding: some dyed clogs, none matted as well, second colour in range.
+  let dyed = 0, both = 0, bad = 0;
+  for (let t = 0; t < 30; t++) {
+    const built = C.seedLevel(C.MATTED_FROM + 6, rand);
+    built.board.forEach((c) => {
+      if (!c || c.dye === undefined) return;
+      dyed++;
+      if (c.matted) both++;
+      if (c.dye === c.color || c.dye < 0 || c.dye >= C.colorsFor(C.MATTED_FROM + 6) ||
+        !(c.dyeIn >= 1 && c.dyeIn <= C.DYE_EVERY)) bad++;
+    });
+  }
+  check('late levels seed dyed clogs', dyed > 0, String(dyed));
+  eq('a clog is never both dyed and matted', both, 0);
+  eq('dye colours and countdowns are sane', bad, 0);
+  const early = C.seedLevel(C.DYE_FROM - 1, rand);
+  check('no dyed clogs before their level', !early.board.some((c) => c && c.dye !== undefined));
+
+  // Stepping: a dyed clog changes after its countdown, then back again.
+  const b = C.makeBoard(8, 16);
+  C.placeClog(b, 3, 15, 0, false, { color: 1, inPieces: 2 });
+  const at = () => b[C.idx(b, 3, 15)];
+  C.dyeStep(b);
+  eq('it waits out its countdown', at().color, 0);
+  eq('it changes on time', (C.dyeStep(b), at().color), 1);
+  eq('and remembers the colour to go back to', at().dye, 0);
+  eq('and restarts its countdown', at().dyeIn, C.DYE_EVERY);
+  for (let k = 0; k < C.DYE_EVERY; k++) C.dyeStep(b);
+  eq('it changes back', at().color, 0);
+
+  // A change that would complete a run waits instead.
+  const w = C.makeBoard(8, 16);
+  [0, 1, 2].forEach((c) => { w[C.idx(w, c, 15)] = { color: 1, type: 'segment', link: null }; });
+  C.placeClog(w, 3, 15, 0, false, { color: 1, inPieces: 1 });
+  C.dyeStep(w);
+  eq('a change never completes a run by itself', w[C.idx(w, 3, 15)].color, 0);
+  w[C.idx(w, 0, 15)] = null;
+  C.dyeStep(w);
+  eq('it goes ahead once it would not', w[C.idx(w, 3, 15)].color, 1);
+  // Chrome counts as a match for that rule too.
+  const x = C.makeBoard(8, 16);
+  [0, 1].forEach((c) => { x[C.idx(x, c, 15)] = { color: 1, type: 'segment', link: null }; });
+  x[C.idx(x, 2, 15)] = { color: C.WILD, type: 'segment', link: null };
+  C.placeClog(x, 3, 15, 0, false, { color: 1, inPieces: 1 });
+  C.dyeStep(x);
+  eq('nor with chrome', x[C.idx(x, 3, 15)].color, 0);
+
+  eq('the copy keeps the dye', C.cloneBoard(b)[C.idx(b, 3, 15)].dye, at().dye);
+  check('dye eases in like matting', C.easeFor(C.DYE_FROM) > 0);
+  check('and raises par a little', C.parPills(C.DYE_FROM + 2) / C.clogTotal(C.DYE_FROM + 2) >
+    C.parPills(C.DYE_FROM - 1) / C.clogTotal(C.DYE_FROM - 1));
+}
+
 /* ---------------------------------------------------------------- report */
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');

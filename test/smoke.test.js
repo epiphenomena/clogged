@@ -289,6 +289,13 @@ C.randomColors = function (rand, colors, chrome) {
   lastDealFrom = colors; lastChrome = chrome;
   return _randomColors(rand, colors, chrome);
 };
+let dyeSteps = 0, dyeChanges = 0;
+const _dyeStep = C.dyeStep;
+C.dyeStep = function (board) {
+  const n = _dyeStep(board);
+  if (!simulating) { dyeSteps++; dyeChanges += n; }
+  return n;
+};
 const _rotate = C.tryRotate;
 C.tryRotate = function (board, piece, dir) { lastRotateDir = dir; return _rotate(board, piece, dir); };
 // Catch the board the moment a level is built, so it is accurate before the
@@ -1097,6 +1104,23 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   pick(C.FIFTH_FROM);
   check('the level picker says how many colours a level uses',
     / 5 colours$/.test(el('lv-clogs').textContent), el('lv-clogs').textContent);
+
+  // Dyed clogs count each coupling once it has settled, and change colour.
+  startAt(C.DYE_FROM + 5);
+  dyeSteps = 0; dyeChanges = 0;
+  const locksBefore = Number(JSON.parse(store.get('clogged.save') || '{"locks":0}').locks);
+  for (let i = 0; i < 1500 && !visible('ov-gameover') && !visible('ov-clear') && dyeSteps < 12; i++) {
+    if (i % 4 === 0) global.document.fire('keydown', { key: ' ' });
+    tick(16);
+  }
+  check('dyed clogs count the couplings', dyeSteps >= 8, String(dyeSteps));
+  check('and some change colour', dyeChanges > 0, String(dyeChanges));
+  const savedNow = JSON.parse(store.get('clogged.save') || 'null');
+  check('one count per coupling landed', !savedNow || savedNow.locks - locksBefore >= dyeSteps - 1,
+    (savedNow && savedNow.locks) + ' locks vs ' + dyeSteps + ' steps');
+  if (visible('ov-gameover')) el('btn-menu').fire('click');
+  else if (visible('ov-clear')) { el('btn-next-level').fire('click'); el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
+  else { el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
 
   // Chrome is dealt from its level and not before.
   startAt(C.CHROME_FROM - 1);

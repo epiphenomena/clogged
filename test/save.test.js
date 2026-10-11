@@ -272,6 +272,23 @@ function sampleGame() {
   check('a chrome arrival is refused', !S.decode(badQ, L));
 }
 
+// Dyed clogs round-trip with their second colour and countdown.
+{
+  const g = sampleGame();
+  const at = g.board.findIndex((c) => c && c.type === 'clog' && !c.matted);
+  g.board[at] = Object.assign({}, g.board[at], { dye: (g.board[at].color + 1) % 3, dyeIn: 2 });
+  const back = S.decode(S.encode(g), LIMITS);
+  check('a game with a dyed clog decodes', !!back);
+  eq('its second colour survives', back.board[at].dye, g.board[at].dye);
+  eq('its countdown survives', back.board[at].dyeIn, 2);
+  const bad = S.encode(g);
+  bad.board[at][3] = bad.board[at][0];
+  check('a dye that is its own colour is refused', !S.decode(bad, LIMITS));
+  const short = S.encode(g);
+  short.board[at] = short.board[at].slice(0, 3);
+  check('a dyed clog missing its dye is refused', !S.decode(short, LIMITS));
+}
+
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');
   failures.forEach((f) => console.error('  ✗ ' + f));

@@ -40,8 +40,12 @@
       board: game.board.map(function (cell) {
         // 0 segment, 1 clog, 2 matted clog. Builds before matting never
         // wrote a 2, so their snapshots still read back unchanged.
-        return cell ? [cell.color, cell.type !== 'clog' ? 0 : cell.matted ? 2 : 1,
-          cell.link || 0] : 0;
+        if (!cell) return 0;
+        // A dyed clog (kind 3) also carries its second colour and countdown.
+        if (cell.type === 'clog' && cell.dye !== undefined) {
+          return [cell.color, 3, 0, cell.dye, cell.dyeIn];
+        }
+        return [cell.color, cell.type !== 'clog' ? 0 : cell.matted ? 2 : 1, cell.link || 0];
       }),
       piece: game.piece
         ? [game.piece.c, game.piece.r, game.piece.orient,
@@ -85,8 +89,11 @@
     for (var i = 0; i < cells; i++) {
       var slot = raw.board[i];
       if (slot === 0 || slot === null) { board.push(null); continue; }
-      if (!Array.isArray(slot) || slot.length !== 3) return null;
-      if (slot[1] !== 0 && slot[1] !== 1 && slot[1] !== 2) return null;
+      if (!Array.isArray(slot)) return null;
+      if (slot[1] !== 0 && slot[1] !== 1 && slot[1] !== 2 && slot[1] !== 3) return null;
+      if (slot.length !== (slot[1] === 3 ? 5 : 3)) return null;
+      if (slot[1] === 3 && (!isInt(slot[3], 0, colors - 1) || slot[3] === slot[0]
+        || !isInt(slot[4], 0, 99))) return null;
       if (!(slot[1] === 0 ? pieceColor(slot[0]) : isInt(slot[0], 0, colors - 1))) return null;
       var link = slot[2];
       if (link !== 0 && !LINKS[link]) return null;
@@ -98,6 +105,7 @@
         link: link === 0 ? null : link
       };
       if (slot[1] === 2) cell.matted = true;
+      if (slot[1] === 3) { cell.dye = slot[3]; cell.dyeIn = slot[4]; }
       if (slot[1] !== 0) clogs++;
       board.push(cell);
     }

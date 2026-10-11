@@ -97,6 +97,7 @@
   function copyCell(cell) {
     var out = { color: cell.color, type: cell.type, link: cell.link };
     if (cell.matted) out.matted = true;
+    if (cell.dye !== undefined) { out.dye = cell.dye; out.dyeIn = cell.dyeIn; }
     return out;
   }
 
@@ -450,6 +451,7 @@
 
   function introductions(challenge) {
     return [
+      { from: DYE_FROM, weight: 0.5 },
       { from: MATTED_FROM, weight: 0.5 },
       { from: fourthFrom(challenge), weight: 1 },
       { from: FIFTH_FROM, weight: 1 }
@@ -589,12 +591,66 @@
     return snags[(rand() * snags.length) | 0];
   }
 
-  function placeClog(board, col, row, color, matted) {
+  // `dye`, if given, is { color, inPieces } for a dyed clog (see dyeStep).
+  function placeClog(board, col, row, color, matted, dye) {
     if (!inBounds(board, col, row)) return false;
     var cell = { color: color, type: 'clog', link: null };
     if (matted) cell.matted = true;
+    else if (dye) { cell.dye = dye.color; cell.dyeIn = dye.inPieces; }
     board[idx(board, col, row)] = cell;
     return true;
+  }
+
+  /* ------------------------------------------------------------ hair dye */
+
+  // From level 13 some clogs are dyed: they carry a second colour and swap to
+  // it every DYE_EVERY couplings, then back. A ring in the colour to come warns
+  // of it, and pulses on the last coupling before the change. A clog is never
+  // both dyed and matted. A change never completes a run on its own (it would
+  // flush the clog for free and set off a cascade between pieces), so a clog
+  // whose change would do that waits until it would not.
+  var DYE_FROM = 13;
+  var DYE_EVERY = 4;
+  var DYE_BASE = 0.12;
+  var DYE_PER_LEVEL = 0.005;
+  var DYE_MAX = 0.25;
+
+  function dyeShare(level) {
+    if ((level || 0) < DYE_FROM) return 0;
+    return Math.min(DYE_MAX, DYE_BASE + (level - DYE_FROM) * DYE_PER_LEVEL);
+  }
+
+  // The second colour and a staggered first countdown, or null. Draws nothing
+  // from rand below DYE_FROM, so earlier levels seed exactly as before.
+  function rollDye(level, color, colors, rand) {
+    var share = dyeShare(level);
+    rand = rand || Math.random;
+    if (!(share > 0) || rand() >= share || colors < 2) return null;
+    var other = (color + 1 + ((rand() * (colors - 1)) | 0)) % colors;
+    return { color: other, inPieces: 1 + ((rand() * DYE_EVERY) | 0) };
+  }
+
+  // One coupling has landed: every dyed clog counts down, and those at zero
+  // change colour if they can. Returns how many changed.
+  function dyeStep(board) {
+    dims(board);
+    var changed = 0;
+    for (var i = 0; i < board.length; i++) {
+      var cell = board[i];
+      if (!cell || cell.dye === undefined) continue;
+      if (cell.dyeIn > 0) cell.dyeIn--;
+      if (cell.dyeIn > 0) continue;
+      var was = cell.color;
+      cell.color = cell.dye;
+      if (findMatches(board).has(i)) {   // the matcher, so chrome counts too
+        cell.color = was;   // not yet: try again after the next coupling
+        continue;
+      }
+      cell.dye = was;
+      cell.dyeIn = DYE_EVERY;
+      changed++;
+    }
+    return changed;
   }
 
   // Past level 16 some clogs are matted, and the share grows every level, from
@@ -670,6 +726,10 @@
         board[i] = { color: order[m], type: 'clog', link: null };
         if (runThrough(board, cc, rr) < 3) {
           if (rollMatted(level, rand)) board[i].matted = true;
+          else {
+            var dye = rollDye(level, order[m], colors, rand);
+            if (dye) { board[i].dye = dye.color; board[i].dyeIn = dye.inPieces; }
+          }
           want[order[m]]--;
           placed++;
           break;
@@ -739,7 +799,8 @@
   var PAR_TWO_PLUNGERS = 2;   // times par
 
   function parPills(level, challenge) {
-    var work = clogTotal(level, challenge) * (1 + mattedShare(level));
+    // A dyed clog costs a little extra: half the time it changes under you.
+    var work = clogTotal(level, challenge) * (1 + mattedShare(level) + dyeShare(level) / 2);
     return Math.round(work * PAR_PILLS_PER_CLOG *
       colorsFor(level, challenge) / BASE_COLORS + PAR_SLACK);
   }
@@ -794,6 +855,8 @@
     dripLanding: dripLanding, dripColumn: dripColumn, placeClog: placeClog,
     dripTarget: dripTarget,
     parPills: parPills, plungersFor: plungersFor,
+    DYE_FROM: DYE_FROM, DYE_EVERY: DYE_EVERY, dyeShare: dyeShare, rollDye: rollDye,
+    dyeStep: dyeStep,
     easeFor: easeFor, introductions: introductions, EASE_LEVELS: EASE_LEVELS,
     mattedShare: mattedShare, rollMatted: rollMatted, MATTED_FROM: MATTED_FROM, dripSnagRows: dripSnagRows, snagMinRow: snagMinRow,
     DRIP_SNAG_CHANCE: DRIP_SNAG_CHANCE,

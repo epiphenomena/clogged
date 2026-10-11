@@ -200,6 +200,8 @@
         Sound.sweep(420 - k * 70, 120, 0.14, 'sine', 0.06, (delay || 0) + 2.05 + d);
       });
     },
+    // A clog changing colour: a quick wobble up.
+    dye: function () { this.sweep(300, 620, 0.18, 'triangle', 0.05); },
     sludge: function () {
       this.sweep(200, 40, 1.1, 'sawtooth', 0.09);
       [160, 120, 90].forEach(function (f, i) {
@@ -220,6 +222,7 @@
     challengePick: Store.get('challenge', false) === true,  // the menu toggle
     challenge: false,     // the mode of the run being played
     plungers: 0,          // efficiency awards won so far this run
+    dyeDue: false,        // a coupling landed; dyed clogs count it once settled
     score: 0,
     best: Store.get('best', 0),
     chain: 0,
@@ -738,6 +741,24 @@
   // drawn live over its cached sprite. It is what tells chrome from the steel
   // flanges at a glance on a small screen.
   var glintT = 0;
+
+  // A dyed clog's warning: a solid ring in the colour it turns next, which
+  // throbs on the last coupling before the change. Solid, so it never reads as
+  // a matted clog's braided collar, which is dashed and in the clog's own colour.
+  function dyeRing(ctx, x, y, s, next, soon) {
+    var P = PALETTE[next];
+    var cx = x + s / 2, cy = y + s / 2;
+    var throb = soon && !reduceMotion ? 0.5 + 0.5 * Math.sin(glintT * 0.012) : 0;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(1.5, s * (0.09 + throb * 0.04));
+    ctx.strokeStyle = soon ? P.light : P.main;
+    ctx.globalAlpha = soon ? 0.75 + throb * 0.25 : 0.9;
+    ctx.beginPath();
+    ctx.arc(cx, cy, s * 0.42, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   function glint(ctx, x, y, s) {
     if (reduceMotion) return;
     var ph = (glintT % 1500) / 1500;
@@ -793,6 +814,7 @@
         blit(ctx, sprite, x, y, s);
         if (cell.matted) blit(ctx, matSprite(cell.color), x, y, s);
         if (cell.color === C.WILD) glint(ctx, x, y, s);
+        if (cell.dye !== undefined) dyeRing(ctx, x, y, s, cell.dye, cell.dyeIn <= 1);
         continue;
       }
 
@@ -896,6 +918,7 @@
 
     blit(ctx, clogSprite(d.color, d.col + d.target), view.x0 + d.col * sz, y, sz);
     if (d.matted) blit(ctx, matSprite(d.color), view.x0 + d.col * sz, y, sz);
+    if (d.dye) dyeRing(ctx, view.x0 + d.col * sz, y, sz, d.dye.color, false);
   }
 
   function drawToast() {
@@ -1289,6 +1312,7 @@
     else if (level === C.fourthFrom(S.challenge)) toast('A FOURTH COLOUR', PALETTE[3].light);
     else if (level === C.FIFTH_FROM) toast('A FIFTH COLOUR', PALETTE[4].light);
     else if (level === C.CHROME_FROM) toast('CHROME FITS ANY COLOUR', '#ffffff');
+    else if (level === C.DYE_FROM) toast('DYED CLOGS CHANGE COLOUR', '#f9c7ff');
   }
 
   function spawn() {
@@ -1418,6 +1442,10 @@
       col: col, color: S.pending.shift(), row: -1, target: target,
       matted: C.rollMatted(S.level, Math.random)
     };
+    if (!S.drip.matted) {
+      S.drip.dye = C.rollDye(S.level, S.drip.color,
+        C.colorsFor(S.level, S.challenge), Math.random);
+    }
     S.phase = 'dripping';
     return true;
   }
@@ -1427,6 +1455,11 @@
     if (hits.size) { beginClear(hits); return; }
     if (S.pending.length && S.sinceDrip >= C.dripEvery(S.level, S.challenge) && startDrip()) return;
     if (clogsLeft() === 0) { levelCleared(); return; }
+    // Once the landing has fully settled, dyed clogs count the coupling.
+    if (S.dyeDue) {
+      S.dyeDue = false;
+      if (C.dyeStep(S.board)) Sound.dye();
+    }
     spawn();
   }
 
@@ -1438,6 +1471,7 @@
     gesture = null;
     S.locks++;
     S.sinceDrip++;
+    S.dyeDue = true;
     if (S.locks >= 3) S.hint = Math.min(S.hint, 0.6);
     Sound.lock();
     S.chain = 0;
@@ -1504,7 +1538,8 @@
     } else if (S.phase === 'dripping') {
       S.drip.row += dt / (DRIP_MS * C.BASE_H / rows());
       if (S.drip.row >= S.drip.target) {
-        C.placeClog(S.board, S.drip.col, S.drip.target, S.drip.color, S.drip.matted);
+        C.placeClog(S.board, S.drip.col, S.drip.target, S.drip.color, S.drip.matted,
+          S.drip.dye);
         S.drip = null;
         S.shake = 2;
         Sound.drip();

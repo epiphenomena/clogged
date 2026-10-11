@@ -60,6 +60,7 @@ every(S[5], [/pipe/, /wider/], 'level 5 widens the pipe');
 every(S[10], [/pipe/, /biggest/i], 'level 10 brings the biggest pipe');
 every(S[C.CHROME_FROM], [/chrome/, /any colour/], 'chrome arrives with its rule');
 every(SC[C.CHROME_FROM], [/chrome/, /any colour/], 'chrome arrives in challenge mode too');
+every(S[C.DYE_FROM], [/teenager/, /dye/i, /change/, /ring/, /puls/], 'dyed clogs arrive with their rule');
 every(S[C.MATTED_FROM], [/baby/, /wipes/, /first/, /unwrap/, /second/, /flush/],
   'the matted clogs arrive with the baby');
 every(S[C.FOURTH_FROM], [/\bcat\b/, /new colour/, /(ease|slow)/, /few levels/],

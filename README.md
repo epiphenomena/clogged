@@ -49,10 +49,16 @@ A few details make or break a plan:
   and a half minutes of stalling. It punishes dithering, not ordinary play.
 
 The fall speed climbs gently to level 20 and barely at all after, since the
-later mechanics carry the difficulty from there. Past level 16
-the pipe has stopped growing, so two more things keep the difficulty climbing
+later mechanics carry the difficulty from there. Past level 10
+the pipe has stopped growing, so three more things keep the difficulty climbing
 to the top — each one announced on the level it first turns up:
 
+- **Some clogs are dyed.** From level 13 (the teenager's weekly hair dye) a
+  share of clogs, about one in eight rising to one in four, carry a second
+  colour and swap to it every four couplings, then back. A solid ring in the
+  colour to come warns of it, and throbs on the last coupling before the
+  change. A change never completes a run by itself — the clog waits instead —
+  and a clog is never both dyed and matted.
 - **Some clogs are matted.** From level 17 a share of the hairballs — arrivals
   included — come bound in a double braided collar.
   A line through one only strips the mat off (for half a clog's points) and
