@@ -926,6 +926,29 @@ function lcg(seed) {
     C.parPills(C.DYE_FROM - 1) / C.clogTotal(C.DYE_FROM - 1));
 }
 
+/* ------------------------------------------------------------ drain snake */
+{
+  const b = C.makeBoard(8, 16);
+  const seg = (c, r, link) => { b[C.idx(b, c, r)] = { color: 1, type: 'segment', link: link || null }; };
+  seg(2, 10, 'right'); seg(3, 10, 'left');   // a lying coupling across the column
+  seg(2, 12);
+  C.placeClog(b, 2, 13, 0, true);             // matted
+  C.placeClog(b, 2, 15, 2);
+  const snake = Object.assign(C.spawnSnake(b), { c: 2, r: 8 });
+  eq('the snake is one cell', C.pieceCells(snake).length, 1);
+  eq('it does not turn', C.tryRotate(b, snake, 1), null);
+  eq('it keeps its kind as it moves', C.tryMove(b, snake, 0, 1).kind, 'snake');
+  eq('it lands on the stack', C.dropDistance(b, snake), 1);
+  const bore = [...C.snakeBore(b, Object.assign({}, snake, { r: 9 }))].map((i) => C.rowOf(b, i)).join();
+  eq('it bores through loose pipe to the first clog and stops there', bore, '10,12,13');
+  const got = C.clearMatches(b, C.snakeBore(b, Object.assign({}, snake, { r: 9 })));
+  eq('a matted clog it reaches is only stripped', got.stripped, 1);
+  eq('the coupling it cut is split, not left dangling', b[C.idx(b, 3, 10)].link, null);
+  check('the clog below the first is untouched', b[C.idx(b, 2, 15)] && b[C.idx(b, 2, 15)].type === 'clog');
+  const empty = C.makeBoard(8, 16);
+  eq('an empty column bores nothing', C.snakeBore(empty, Object.assign(C.spawnSnake(empty), { r: 15 })).size, 0);
+}
+
 /* ---------------------------------------------------------------- report */
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');

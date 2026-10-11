@@ -1122,6 +1122,29 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   else if (visible('ov-clear')) { el('btn-next-level').fire('click'); el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
   else { el('btn-pause').fire('click'); el('btn-new-game').fire('click'); }
 
+  // The drain snake, staged from a save: dropped down a column with a clog in
+  // it, it takes out exactly one clog and is used up.
+  startAt(C.SNAKE_FROM);
+  tick(16);
+  const snapS = JSON.parse(store.get('clogged.save'));
+  const kinds = (sv) => sv.board.filter((c) => c && c[1] !== 0).length;
+  const clogAt = snapS.board.findIndex((c) => c && c[1] === 1);
+  snapS.piece = [clogAt % snapS.w, 0, 0, 0, 0, 1];
+  snapS.pending = [];
+  snapS.se = 1;
+  el('btn-pause').fire('click'); el('btn-new-game').fire('click');
+  store.set('clogged.save', JSON.stringify(snapS));
+  el('btn-resume-saved').fire('click');
+  if (visible('ov-pause')) el('btn-resume').fire('click');
+  global.document.fire('keydown', { key: ' ' });
+  for (let i = 0; i < 200 && !visible('ov-clear'); i++) tick(16);
+  const afterS = JSON.parse(store.get('clogged.save') || 'null');
+  check('the snake flushes one clog', visible('ov-clear') || (afterS && kinds(afterS) === kinds(snapS) - 1),
+    afterS ? kinds(snapS) + ' -> ' + kinds(afterS) : 'no save');
+  check('and is used up', !afterS || afterS.piece.length === 5, afterS && JSON.stringify(afterS.piece));
+  if (visible('ov-clear')) { el('btn-next-level').fire('click'); }
+  el('btn-pause').fire('click'); el('btn-new-game').fire('click');
+
   // Chrome is dealt from its level and not before.
   startAt(C.CHROME_FROM - 1);
   check('no chrome is dealt before its level', lastChrome === 0, String(lastChrome));

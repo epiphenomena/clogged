@@ -280,6 +280,7 @@
   /* ---------------------------------------------------------------- pieces */
 
   function pieceCells(p) {
+    if (p.kind === 'snake') return [{ c: p.c, r: p.r, color: null, link: null, snake: true }];
     var off = OFFSETS[p.orient];
     var link = LINKS[p.orient];
     return [
@@ -300,12 +301,14 @@
   function fits(board, p) { return canPlace(board, pieceCells(p)); }
 
   function movedPiece(p, dc, dr, orient) {
-    return {
+    var next = {
       c: p.c + dc,
       r: p.r + dr,
       orient: orient === undefined ? p.orient : orient,
       colors: p.colors
     };
+    if (p.kind) next.kind = p.kind;
+    return next;
   }
 
   function tryMove(board, p, dc, dr) {
@@ -354,6 +357,7 @@
   }
 
   function tryRotate(board, p, dir) {
+    if (p.kind === 'snake') return null;   // one cell: nothing to turn
     var orient = (p.orient + (dir > 0 ? 1 : 3)) % 4;
     var kicks = kicksFor(p, orient);
     for (var i = 0; i < kicks.length; i++) {
@@ -382,6 +386,33 @@
     // A half that landed out of bounds leaves its partner as a free single.
     if (written.length === 1) board[written[0]].link = null;
     return written;
+  }
+
+  /* ---------------------------------------------------------- drain snake */
+
+  // A chain of SNAKE_CHAIN or better earns a drain snake, once a level, from
+  // SNAKE_FROM. It is a one-cell piece, aimed like any other. Where it lands it
+  // bores straight down its column: every loose bit of pipe below it goes, and
+  // the first clog it reaches is flushed (or, if matted, stripped). Returns the
+  // cells to clear, for clearMatches; nothing is placed on the board.
+  var SNAKE_FROM = 6;
+  var SNAKE_CHAIN = 3;
+
+  function snakeBore(board, p) {
+    var W = dims(board).w, H = board.h;
+    var hits = new Set();
+    for (var r = p.r + 1; r < H; r++) {
+      var at = r * W + p.c;
+      var cell = board[at];
+      if (!cell) continue;
+      hits.add(at);
+      if (cell.type === 'clog') break;
+    }
+    return hits;
+  }
+
+  function spawnSnake(board) {
+    return { c: (dims(board).w >> 1) - 1, r: 0, orient: 0, colors: null, kind: 'snake' };
   }
 
   function spawnPiece(board, colors) {
@@ -855,6 +886,8 @@
     dripLanding: dripLanding, dripColumn: dripColumn, placeClog: placeClog,
     dripTarget: dripTarget,
     parPills: parPills, plungersFor: plungersFor,
+    SNAKE_FROM: SNAKE_FROM, SNAKE_CHAIN: SNAKE_CHAIN, snakeBore: snakeBore,
+    spawnSnake: spawnSnake,
     DYE_FROM: DYE_FROM, DYE_EVERY: DYE_EVERY, dyeShare: dyeShare, rollDye: rollDye,
     dyeStep: dyeStep,
     easeFor: easeFor, introductions: introductions, EASE_LEVELS: EASE_LEVELS,

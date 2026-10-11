@@ -289,6 +289,25 @@ function sampleGame() {
   check('a dyed clog missing its dye is refused', !S.decode(short, LIMITS));
 }
 
+// A drain snake in flight, in NEXT, or already used this level, survives.
+{
+  const g = sampleGame();
+  g.piece = { c: 3, r: 2, orient: 0, colors: null, kind: 'snake' };
+  g.snakeNext = false;
+  g.snakeEarned = true;
+  const back = S.decode(S.encode(g), LIMITS);
+  eq('a snake in flight survives', back.piece.kind, 'snake');
+  eq('where it was', back.piece.c + ',' + back.piece.r, '3,2');
+  eq('the level has had its snake', back.snakeEarned, true);
+  const n = sampleGame();
+  n.snakeNext = true;
+  eq('a snake waiting in next survives', S.decode(S.encode(n), LIMITS).snakeNext, true);
+  eq('an old save has no snake', S.decode(S.encode(sampleGame()), LIMITS).snakeNext, false);
+  const bad = S.encode(g);
+  bad.piece[5] = 2;
+  check('an unknown piece kind is refused', !S.decode(bad, LIMITS));
+}
+
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');
   failures.forEach((f) => console.error('  ✗ ' + f));

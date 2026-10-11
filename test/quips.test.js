@@ -58,6 +58,8 @@ every(SC[1], [/plumber/, /four of a colour/, /clear/i, /top/, /\bcat\b/, /four c
   'a challenge game opens with the premise, the cat and four colours');
 every(S[5], [/pipe/, /wider/], 'level 5 widens the pipe');
 every(S[10], [/pipe/, /biggest/i], 'level 10 brings the biggest pipe');
+every(S[C.SNAKE_FROM], [/snake/, /chain of three/, /once a level/, /column/, /first clog/],
+  'the drain snake arrives with its rule');
 every(S[C.CHROME_FROM], [/chrome/, /any colour/], 'chrome arrives with its rule');
 every(SC[C.CHROME_FROM], [/chrome/, /any colour/], 'chrome arrives in challenge mode too');
 every(S[C.DYE_FROM], [/teenager/, /dye/i, /change/, /ring/, /puls/], 'dyed clogs arrive with their rule');

@@ -75,6 +75,17 @@
       'Biggest pipe yet. Lots of room to move — and the Pipers have never ' +
         'seen empty space they couldn\'t fill.'
     ];
+    s[C.SNAKE_FROM] = [
+      'You finally bought a proper drain snake. Pull off a chain of three or ' +
+        'more and one turns up in NEXT, once a level: drop it down a column ' +
+        'and it bores through loose pipe to flush the first clog it hits.',
+      'New tool day: a drain snake. A chain of three or more earns one, once ' +
+        'a level. Aim it at a column and it chews down through the pipe and ' +
+        'flushes the first clog it reaches.',
+      'The Pipers\' drain has earned the big guns: a drain snake. Make a ' +
+        'chain of three or more and it is yours, once a level. Drop it in a ' +
+        'column; it bores down and flushes the first clog in its way.'
+    ];
     s[C.CHROME_FROM] = [
       'Good news for once: the supply shop had chrome universal couplings on ' +
         'sale. A chrome half fits any colour, so it counts toward whatever ' +

@@ -75,6 +75,12 @@ to the top — each one announced on the level it first turns up:
 
 Some help arrives too:
 
+- **The drain snake.** From level 6, a chain of three or more earns a drain
+  snake, once a level. It jumps the queue into NEXT, and is aimed like any
+  coupling (it does not turn). Where it lands it bores straight down its
+  column: every loose bit of pipe below it goes, and the first clog it reaches
+  is flushed — or, if matted, stripped. A faint highlight shows exactly what it
+  will take out before you drop it.
 - **Chrome universal couplings.** From level 9, now and then one half of a
   coupling comes up chrome, and chrome matches any colour: it joins whatever
   run it lands in, and can complete a run on each side of it at once (red red
