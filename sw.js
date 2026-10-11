@@ -31,8 +31,14 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
+  // Revalidate with the server every time rather than trust the HTTP cache's
+  // guess at freshness: the scripts depend on each other, and a page that got
+  // a new game.js beside a stale save.js would misread its own saves. A
+  // navigation cannot be re-issued with options, so it goes as it came.
+  const fresh = req.mode === 'navigate' ? fetch(req) : fetch(req.url, { cache: 'no-cache' });
+
   event.respondWith(
-    fetch(req)
+    fresh
       .then((res) => {
         if (res && res.ok) {
           const copy = res.clone();
