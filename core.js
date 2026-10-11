@@ -441,9 +441,16 @@
 
   // The whole quota for a level, seeded and dripped together. This used to add
   // four per level up to 64, which outran the player badly.
+  // Every colour added makes a line of four that much harder to come by, so
+  // the quota's ceiling drops with the colour count rather than holding at 40
+  // all the way up. Simulated play fell off a cliff the moment a fourth colour
+  // arrived under a 40-clog ceiling.
+  var CLOG_CAP = [0, 0, 0, 40, 28, 20];
+
   function clogTotal(level, challenge) {
     var l = Math.max(0, level || 0);
-    return Math.round(Math.min(4 + l * 2, 40) * (1 - EASE_CLOGS * easeFor(l, challenge)));
+    var cap = CLOG_CAP[colorsFor(l, challenge)];
+    return Math.round(Math.min(4 + l * 2, cap) * (1 - EASE_CLOGS * easeFor(l, challenge)));
   }
 
   // How much of the quota is already wedged in when the level opens. The share
@@ -451,7 +458,7 @@
   // still read and the rest wash down while it is played.
   var SEED_SHARE_BASE = 0.9;
   var SEED_SHARE_PER_LEVEL = 0.05;
-  var SEED_SHARE_MIN = 0.35;
+  var SEED_SHARE_MIN = 0.5;
 
   function clogSeedCount(level, challenge) {
     var total = clogTotal(level, challenge);
@@ -461,8 +468,11 @@
   }
 
   // Couplings landed between one arrival and the next.
+  // With four or more colours an arrival never comes sooner than every third
+  // coupling: the board fills with odd halves fast enough as it is.
   function dripEvery(level, challenge) {
-    return Math.max(2, 4 - Math.floor(level / 8)) +
+    var floor = colorsFor(level, challenge) > BASE_COLORS ? 3 : 2;
+    return Math.max(floor, 4 - Math.floor(level / 8)) +
       (easeFor(level, challenge) >= EASE_DRIP ? 1 : 0);
   }
 
@@ -560,14 +570,15 @@
   }
 
   // Past level 16 some clogs are matted, and the share grows every level, from
-  // one in ten at level 17 to about three in five at the top.
+  // one in ten at level 17, a point more each level, to at most about a third.
   var MATTED_FROM = 17;
   var MATTED_BASE = 0.1;
-  var MATTED_PER_LEVEL = 0.015;
+  var MATTED_PER_LEVEL = 0.01;
+  var MATTED_MAX = 0.35;
 
   function mattedShare(level) {
     if ((level || 0) < MATTED_FROM) return 0;
-    return Math.min(1, MATTED_BASE + (level - MATTED_FROM) * MATTED_PER_LEVEL);
+    return Math.min(MATTED_MAX, MATTED_BASE + (level - MATTED_FROM) * MATTED_PER_LEVEL);
   }
 
   function rollMatted(level, rand) {
@@ -668,14 +679,20 @@
 
   var FALL_BASE_MS = 520;      // level 0, on the pipe the game opens with
   var FALL_PER_LEVEL_MS = 10;
-  var FALL_FLOOR_MS = 220;
+  // Past level 20 the other mechanics carry the difficulty, so the fall barely
+  // quickens: 4ms a level, down to a floor the top levels only just reach.
+  var FALL_LATE_FROM = 20;
+  var FALL_LATE_PER_LEVEL_MS = 4;
+  var FALL_FLOOR_MS = 240;
 
   // Milliseconds per row of free fall. A taller pipe gets a shorter interval,
   // so a coupling takes about the same time to cross the screen whatever size
   // the fittings are: the rows are smaller, not slower.
   function fallInterval(level, elapsedMs, h, challenge) {
-    var base = Math.max(FALL_FLOOR_MS,
-      FALL_BASE_MS - Math.max(0, level || 0) * FALL_PER_LEVEL_MS) *
+    var l = Math.max(0, level || 0);
+    var base = Math.max(FALL_FLOOR_MS, FALL_BASE_MS
+      - Math.min(l, FALL_LATE_FROM) * FALL_PER_LEVEL_MS
+      - Math.max(0, l - FALL_LATE_FROM) * FALL_LATE_PER_LEVEL_MS) *
       (1 + EASE_FALL * easeFor(level, challenge));
     var scaled = base * (BASE_H / (h || BASE_H));
     return scaled * Math.pow(PRESSURE_FACTOR, pressureStep(level, elapsedMs));

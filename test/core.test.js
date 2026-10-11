@@ -667,9 +667,11 @@ function lcg(seed) {
 
   eq('no clog is matted before level 17', C.mattedShare(C.MATTED_FROM - 1), 0);
   check('some are from level 17', C.mattedShare(C.MATTED_FROM) > 0);
-  check('the share grows every level after',
+  check('the share never shrinks after',
     Array.from({ length: C.MAX_LEVEL - C.MATTED_FROM }, (_, i) =>
-      C.mattedShare(C.MATTED_FROM + i + 1) > C.mattedShare(C.MATTED_FROM + i)).every(Boolean));
+      C.mattedShare(C.MATTED_FROM + i + 1) >= C.mattedShare(C.MATTED_FROM + i)).every(Boolean));
+  check('it grows for a good while', C.mattedShare(C.MATTED_FROM + 15) > C.mattedShare(C.MATTED_FROM + 5));
+  check('and tops out at about a third', C.mattedShare(C.MAX_LEVEL) <= 0.35, String(C.mattedShare(C.MAX_LEVEL)));
   check('but never mats every clog', C.mattedShare(C.MAX_LEVEL) < 0.75,
     'share=' + C.mattedShare(C.MAX_LEVEL));
 

@@ -48,7 +48,8 @@ A few details make or break a plan:
   speed up a few percent every 30 seconds, topping out around 1.7× after five
   and a half minutes of stalling. It punishes dithering, not ordinary play.
 
-The fall speed climbs gently, reaching its cap around level 30. Past level 16
+The fall speed climbs gently to level 20 and barely at all after, since the
+later mechanics carry the difficulty from there. Past level 16
 the pipe has stopped growing, so two more things keep the difficulty climbing
 to the top — each one announced on the level it first turns up:
 
@@ -56,11 +57,15 @@ to the top — each one announced on the level it first turns up:
   included — come bound in a double braided collar.
   A line through one only strips the mat off (for half a clog's points) and
   leaves a plain hairball where it was, which takes a second line to clear.
-  One in ten is matted at level 17, rising every level to about three in five
-  at level 50.
+  One in ten is matted at level 17, a point more each level, topping out at
+  about a third.
 - **More colours.** A fourth colour joins at level 20, and a fifth at
-  level 32. (The screenshots above stick to the opening three on purpose.) Couplings and clogs both use them, so four of a kind
-  takes more planning. The level picker says how many colours a level uses.
+  level 32. (The screenshots above stick to the opening three on purpose.)
+  Couplings and clogs both use them, so four of a kind takes more planning,
+  and each colour lowers the most clogs a level can hold: 40 with three
+  colours, 28 with four and 20 with five. Arrivals also come no faster than
+  every third coupling once there are four. The level picker says how many
+  colours a level uses.
 
 The screen between levels tells the story of the household whose drain this
 is, and each new thing is introduced there with its own chapter. The title,
