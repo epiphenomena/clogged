@@ -75,6 +75,17 @@
       'Biggest pipe yet. Lots of room to move — and the Pipers have never ' +
         'seen empty space they couldn\'t fill.'
     ];
+    s[C.CHROME_FROM] = [
+      'Good news for once: the supply shop had chrome universal couplings on ' +
+        'sale. A chrome half fits any colour, so it counts toward whatever ' +
+        'line it lands in. You will not get many. Use them wisely.',
+      'You treated yourself to chrome universal couplings. Now and then one ' +
+        'half of a coupling comes up chrome, and chrome matches any colour ' +
+        'it touches.',
+      'The van now carries chrome universal couplings, the plumber\'s ' +
+        'skeleton key. A chrome half matches any colour in its line. They ' +
+        'turn up now and again, so save them for the awkward spots.'
+    ];
     s[C.MATTED_FROM] = [
       'Congratulations — the Pipers have a new baby! Somebody ' +
         'thinks the wipes are flushable. Matted clogs come wrapped up tight: ' +

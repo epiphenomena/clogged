@@ -35,7 +35,12 @@
     // for normal vision, and still ~13 under simulated deuteranopia,
     // protanopia and tritanopia.
     { light: '#fca5a5', main: '#dc2626', dark: '#991b1b', deep: '#450a0a', rgb: '220,38,38' },
-    { light: '#93c5fd', main: '#2563eb', dark: '#1e40af', deep: '#172554', rgb: '37,99,235' }
+    { light: '#93c5fd', main: '#2563eb', dark: '#1e40af', deep: '#172554', rgb: '37,99,235' },
+    // Chrome (Core.WILD): not a colour but a mirror finish, so it is drawn with
+    // hard bright bands (see pipeBody) and a moving glint, and reads as brighter
+    // than the grey-blue steel of the flanges.
+    { light: '#ffffff', main: '#e8eef8', dark: '#7d8899', deep: '#3a4252', rgb: '232,238,248',
+      chrome: true }
   ];
 
   // The trophy's metal, by tier (see Core.trophyFor). style.css carries the
@@ -245,7 +250,8 @@
   var Sc = self.Scores;
   var Sv = self.Save;
   var Q = self.Quips;
-  var SAVE_LIMITS = { maxW: C.MAX_W, maxH: C.MAX_H, colors: C.COLORS, maxLevel: C.MAX_LEVEL };
+  var SAVE_LIMITS = { maxW: C.MAX_W, maxH: C.MAX_H, colors: C.COLORS, wild: C.WILD,
+    maxLevel: C.MAX_LEVEL };
   var history = Sc.seedBest(Sc.sanitize(Store.get('history', null)), S.best);
 
   var view = {
@@ -455,11 +461,22 @@
     var g = horizontal
       ? ctx.createLinearGradient(0, y, 0, y + h)
       : ctx.createLinearGradient(x, 0, x + w, 0);
-    g.addColorStop(0, P.dark);
-    g.addColorStop(0.22, P.light);
-    g.addColorStop(0.5, P.main);
-    g.addColorStop(0.85, P.dark);
-    g.addColorStop(1, P.deep);
+    if (P.chrome) {
+      // A mirror reflects in bands, not a smooth falloff.
+      g.addColorStop(0, '#4b5466');
+      g.addColorStop(0.14, '#ffffff');
+      g.addColorStop(0.3, '#dfe6f1');
+      g.addColorStop(0.46, '#8e9aae');
+      g.addColorStop(0.6, '#ffffff');
+      g.addColorStop(0.8, '#c3ccda');
+      g.addColorStop(1, '#3a4252');
+    } else {
+      g.addColorStop(0, P.dark);
+      g.addColorStop(0.22, P.light);
+      g.addColorStop(0.5, P.main);
+      g.addColorStop(0.85, P.dark);
+      g.addColorStop(1, P.deep);
+    }
     roundRect(ctx, x, y, w, h, radii);
     ctx.fillStyle = g;
     ctx.fill();
@@ -717,6 +734,30 @@
     if (sprite) ctx.drawImage(sprite, x, y, s, s);
   }
 
+  // A streak of light sweeping across a chrome half every second and a half,
+  // drawn live over its cached sprite. It is what tells chrome from the steel
+  // flanges at a glance on a small screen.
+  var glintT = 0;
+  function glint(ctx, x, y, s) {
+    if (reduceMotion) return;
+    var ph = (glintT % 1500) / 1500;
+    if (ph > 0.45) return;
+    var k = ph / 0.45;
+    var gx = x - s + k * s * 3;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x + s * 0.06, y + s * 0.06, s * 0.88, s * 0.88);
+    ctx.clip();
+    var g = ctx.createLinearGradient(gx, y, gx + s * 0.5, y + s);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillRect(x, y, s, s);
+    ctx.restore();
+  }
+
   function cellXY(c, r) {
     return { x: view.x0 + c * view.cell, y: view.y0 + r * view.cell };
   }
@@ -751,6 +792,7 @@
       if (!clearing || !clearing.has(i)) {
         blit(ctx, sprite, x, y, s);
         if (cell.matted) blit(ctx, matSprite(cell.color), x, y, s);
+        if (cell.color === C.WILD) glint(ctx, x, y, s);
         continue;
       }
 
@@ -819,6 +861,7 @@
       if (cl.r < 0) return;
       var pos = cellXY(cl.c, cl.r);
       blit(ctx, segSprite(cl.color, cl.link), pos.x, pos.y, s);
+      if (cl.color === C.WILD) glint(ctx, pos.x, pos.y, s);
     });
   }
 
@@ -1113,6 +1156,7 @@
   }
 
   function render(t) {
+    glintT = t || 0;
     bctx.save();
     bctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     if (view.bg) bctx.drawImage(view.bg, 0, 0, view.vw, view.vh);
@@ -1232,7 +1276,7 @@
     S.pressure = 0;
     S.locks = 0;
     S.hint = 1;
-    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level, S.challenge));
+    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level, S.challenge), C.chromeChance(S.level, S.challenge));
     hideAllOverlays();
     spawn();
     announce(S.level);
@@ -1244,11 +1288,12 @@
     if (level === C.MATTED_FROM) toast('MATTED CLOGS', '#ffdf9a');
     else if (level === C.fourthFrom(S.challenge)) toast('A FOURTH COLOUR', PALETTE[3].light);
     else if (level === C.FIFTH_FROM) toast('A FIFTH COLOUR', PALETTE[4].light);
+    else if (level === C.CHROME_FROM) toast('CHROME FITS ANY COLOUR', '#ffffff');
   }
 
   function spawn() {
     S.piece = C.spawnPiece(S.board, S.nextColors);
-    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level, S.challenge));
+    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level, S.challenge), C.chromeChance(S.level, S.challenge));
     drawNext();
     S.fallTimer = 0;
     S.lockPending = false;

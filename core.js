@@ -40,6 +40,14 @@
   // Challenge mode deals the fourth colour from level 1 instead. Every rule
   // that depends on the colour count takes the mode as its last argument.
   var CHALLENGE_FOURTH_FROM = 1;
+  // Chrome universal couplings: a pipe half that matches any colour. It is a
+  // colour index of its own, one past the last real colour, and only ever
+  // turns up on a coupling the player is dealt — never on a clog, a seeded
+  // board or an arrival.
+  var WILD = COLORS;
+  var CHROME_FROM = 9;
+  // Couplings with one chrome half, by colour count: more colours, more help.
+  var CHROME_RATE = [0, 0, 0, 1 / 14, 1 / 10, 1 / 7];
   var MIN_RUN = 4;
   var MAX_LEVEL = 50;   // flushing this one wins the game
   // Pressure is meant to punish stalling, not ordinary play. Nothing happens at
@@ -129,37 +137,47 @@
 
   // Every cell belonging to a run of `min` or more same-coloured cells,
   // scanned across and down. A cell in both directions is reported once.
+  // Each cell matches a set of colours: its own, or every colour for chrome.
+  var ALL_COLORS = (1 << COLORS) - 1;
+  function colorMask(cell) {
+    return cell.color === WILD ? ALL_COLORS : 1 << cell.color;
+  }
+
+  // A run is MIN_RUN or more cells in a row or column that share at least one
+  // colour, with at least one real colour among them (four chrome halves are
+  // not a free clear). Chrome joins whatever run it touches, and can serve a
+  // different run on each side of it: R R R S B B B clears all seven. Scanning
+  // from every start keeps that simple; a line is at most 24 cells.
+  function scanLine(board, cells, min, hits) {
+    var n = cells.length;
+    for (var i = 0; i < n; i++) {
+      if (!board[cells[i]]) continue;
+      var m = ALL_COLORS, real = false, j = i;
+      while (j < n && board[cells[j]]) {
+        var mm = m & colorMask(board[cells[j]]);
+        if (!mm) break;
+        m = mm;
+        if (board[cells[j]].color !== WILD) real = true;
+        j++;
+      }
+      if (j - i >= min && real) for (var k = i; k < j; k++) hits.add(cells[k]);
+    }
+  }
+
   function findMatches(board, min) {
     min = min || MIN_RUN;
     var d = dims(board), W = d.w, H = d.h;
     var hits = new Set();
-    var r, c, run, i;
-
+    var r, c, line;
     for (r = 0; r < H; r++) {
-      run = 1;
-      for (c = 1; c <= W; c++) {
-        var a = board[r * W + c - 1];
-        var b = c < W ? board[r * W + c] : null;
-        if (a && b && a.color === b.color) {
-          run++;
-        } else {
-          if (a && run >= min) for (i = 0; i < run; i++) hits.add(r * W + c - 1 - i);
-          run = 1;
-        }
-      }
+      line = [];
+      for (c = 0; c < W; c++) line.push(r * W + c);
+      scanLine(board, line, min, hits);
     }
     for (c = 0; c < W; c++) {
-      run = 1;
-      for (r = 1; r <= H; r++) {
-        var u = board[(r - 1) * W + c];
-        var dn = r < H ? board[r * W + c] : null;
-        if (u && dn && u.color === dn.color) {
-          run++;
-        } else {
-          if (u && run >= min) for (i = 0; i < run; i++) hits.add((r - 1 - i) * W + c);
-          run = 1;
-        }
-      }
+      line = [];
+      for (r = 0; r < H; r++) line.push(r * W + c);
+      scanLine(board, line, min, hits);
     }
     return hits;
   }
@@ -378,10 +396,20 @@
     return l >= FIFTH_FROM ? 5 : l >= fourthFrom(challenge) ? 4 : BASE_COLORS;
   }
 
-  function randomColors(rand, colors) {
+  // A coupling's two colours. With a chrome chance, one half (never both) may
+  // come up chrome; with none, no extra random number is drawn, so seeded
+  // sequences are unchanged where chrome cannot appear.
+  function randomColors(rand, colors, chrome) {
     rand = rand || Math.random;
     var k = colors || BASE_COLORS;
-    return [(rand() * k) | 0, (rand() * k) | 0];
+    var pair = [(rand() * k) | 0, (rand() * k) | 0];
+    if (chrome > 0 && rand() < chrome) pair[rand() < 0.5 ? 0 : 1] = WILD;
+    return pair;
+  }
+
+  function chromeChance(level, challenge) {
+    if ((level || 0) < CHROME_FROM) return 0;
+    return CHROME_RATE[colorsFor(level, challenge)];
   }
 
   /* ---------------------------------------------------------------- seeding */
@@ -749,6 +777,7 @@
     BASE_W: BASE_W, BASE_H: BASE_H, MAX_W: MAX_W, MAX_H: MAX_H,
     COLORS: COLORS, BASE_COLORS: BASE_COLORS, FOURTH_FROM: FOURTH_FROM, FIFTH_FROM: FIFTH_FROM, colorsFor: colorsFor,
     CHALLENGE_FOURTH_FROM: CHALLENGE_FOURTH_FROM, fourthFrom: fourthFrom,
+    WILD: WILD, CHROME_FROM: CHROME_FROM, chromeChance: chromeChance, colorMask: colorMask,
     MIN_RUN: MIN_RUN, MAX_LEVEL: MAX_LEVEL,
     DIRS: DIRS, OFFSETS: OFFSETS, LINKS: LINKS, OPPOSITE: OPPOSITE,
     dimsFor: dimsFor, dims: dims,

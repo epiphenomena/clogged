@@ -249,6 +249,29 @@ function sampleGame() {
   eq('a junk tally is dropped, not the save', S.decode(junk, LIMITS).plungers, 0);
 }
 
+// Chrome halves round-trip wherever a coupling can be, and nowhere else.
+{
+  const L = Object.assign({ wild: C.WILD }, LIMITS);
+  const g = sampleGame();
+  const segAt = g.board.findIndex((c) => c && c.type === 'segment');
+  g.board[segAt] = Object.assign({}, g.board[segAt], { color: C.WILD });
+  g.piece = Object.assign({}, g.piece, { colors: [C.WILD, 1] });
+  g.next = [2, C.WILD];
+  const back = S.decode(S.encode(g), L);
+  check('a game with chrome halves decodes', !!back);
+  eq('a chrome half on the board survives', back.board[segAt].color, C.WILD);
+  eq('a chrome half on the piece survives', back.piece.colors[0], C.WILD);
+  eq('a chrome half in next survives', back.next[1], C.WILD);
+  check('without the wild limit it is refused', !S.decode(S.encode(g), LIMITS));
+  const clogAt = sampleGame().board.findIndex((c) => c && c.type === 'clog');
+  const bad = S.encode(sampleGame());
+  bad.board[clogAt][0] = C.WILD;
+  check('a chrome clog is refused', !S.decode(bad, L));
+  const badQ = S.encode(sampleGame());
+  badQ.pending = [C.WILD];
+  check('a chrome arrival is refused', !S.decode(badQ, L));
+}
+
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');
   failures.forEach((f) => console.error('  ✗ ' + f));

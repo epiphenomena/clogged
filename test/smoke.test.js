@@ -283,9 +283,12 @@ C.dropDistance = function (board, piece) {
 };
 let lastRotateDir = 0;
 // The colour count the game last dealt couplings from.
-let lastDealFrom = null;
+let lastDealFrom = null, lastChrome = null;
 const _randomColors = C.randomColors;
-C.randomColors = function (rand, colors) { lastDealFrom = colors; return _randomColors(rand, colors); };
+C.randomColors = function (rand, colors, chrome) {
+  lastDealFrom = colors; lastChrome = chrome;
+  return _randomColors(rand, colors, chrome);
+};
 const _rotate = C.tryRotate;
 C.tryRotate = function (board, piece, dir) { lastRotateDir = dir; return _rotate(board, piece, dir); };
 // Catch the board the moment a level is built, so it is accurate before the
@@ -1074,7 +1077,7 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
     const seen = new Set();
     startAt(level);
     for (let i = 0; i < 4000 && seen.size < 5 && !visible('ov-gameover') && !visible('ov-clear'); i++) {
-      if (pendingSpawn) { pendingSpawn = false; liveColors.forEach((c) => seen.add(c)); }
+      if (pendingSpawn) { pendingSpawn = false; liveColors.forEach((c) => { if (c !== C.WILD) seen.add(c); }); }
       if (i % 4 === 0) global.document.fire('keydown', { key: ' ' });
       tick(16);
     }
@@ -1094,6 +1097,14 @@ check('retry clears the game-over overlay', !visible('ov-gameover'));
   pick(C.FIFTH_FROM);
   check('the level picker says how many colours a level uses',
     / 5 colours$/.test(el('lv-clogs').textContent), el('lv-clogs').textContent);
+
+  // Chrome is dealt from its level and not before.
+  startAt(C.CHROME_FROM - 1);
+  check('no chrome is dealt before its level', lastChrome === 0, String(lastChrome));
+  el('btn-pause').fire('click'); el('btn-new-game').fire('click');
+  startAt(C.CHROME_FROM);
+  check('chrome is dealt from its level', lastChrome > 0, String(lastChrome));
+  el('btn-pause').fire('click'); el('btn-new-game').fire('click');
 
   // Challenge mode: the fourth colour from level 1, remembered, and carried
   // by the run rather than by whatever the menu says later.

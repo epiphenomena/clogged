@@ -64,6 +64,10 @@
   function decode(raw, limits) {
     if (!raw || typeof raw !== 'object' || raw.v !== VERSION) return null;
     var colors = limits.colors;
+    // Chrome (limits.wild) may sit on a coupling half, the falling piece or the
+    // next one, never on a clog or in the queue of arrivals.
+    var wild = limits.wild;
+    var pieceColor = function (n) { return isInt(n, 0, colors - 1) || (wild !== undefined && n === wild); };
 
     // The board's own geometry comes out of the record, so a snapshot taken on
     // one size of pipe cannot be read back as another.
@@ -82,8 +86,8 @@
       var slot = raw.board[i];
       if (slot === 0 || slot === null) { board.push(null); continue; }
       if (!Array.isArray(slot) || slot.length !== 3) return null;
-      if (!isInt(slot[0], 0, colors - 1)) return null;
       if (slot[1] !== 0 && slot[1] !== 1 && slot[1] !== 2) return null;
+      if (!(slot[1] === 0 ? pieceColor(slot[0]) : isInt(slot[0], 0, colors - 1))) return null;
       var link = slot[2];
       if (link !== 0 && !LINKS[link]) return null;
       // Clogs are never half of a coupling.
@@ -104,12 +108,12 @@
       if (!Array.isArray(p) || p.length !== 5) return null;
       if (!isInt(p[0], 0, cols - 1) || !isInt(p[1], 0, rows - 1)) return null;
       if (!isInt(p[2], 0, 3)) return null;
-      if (!isInt(p[3], 0, colors - 1) || !isInt(p[4], 0, colors - 1)) return null;
+      if (!pieceColor(p[3]) || !pieceColor(p[4])) return null;
       piece = { c: p[0], r: p[1], orient: p[2], colors: [p[3], p[4]] };
     }
 
     if (!Array.isArray(raw.next) || raw.next.length !== 2) return null;
-    if (!isInt(raw.next[0], 0, colors - 1) || !isInt(raw.next[1], 0, colors - 1)) return null;
+    if (!pieceColor(raw.next[0]) || !pieceColor(raw.next[1])) return null;
 
     if (!Array.isArray(raw.pending)) return null;
     for (var q = 0; q < raw.pending.length; q++) {

@@ -775,6 +775,96 @@ function lcg(seed) {
     C.parPills(2, true) / C.clogTotal(2, true) > C.parPills(2) / C.clogTotal(2));
 }
 
+/* ------------------------------------------------------ chrome couplings */
+{
+  // The colour-mask matcher must agree exactly with plain colour runs when
+  // there is no chrome about. This is the matcher it replaced.
+  function oldMatches(board) {
+    const W = board.w, H = board.h, hits = new Set();
+    const scan = (cells) => {
+      let i = 0;
+      while (i < cells.length) {
+        const a = board[cells[i]];
+        let j = i + 1;
+        if (a) while (j < cells.length && board[cells[j]] && board[cells[j]].color === a.color) j++;
+        if (a && j - i >= C.MIN_RUN) for (let k = i; k < j; k++) hits.add(cells[k]);
+        i = j;
+      }
+    };
+    for (let r = 0; r < H; r++) scan(Array.from({ length: W }, (_, c) => r * W + c));
+    for (let c = 0; c < W; c++) scan(Array.from({ length: H }, (_, r) => r * W + c));
+    return hits;
+  }
+  let n = 7;
+  const rand = () => ((n = (n * 1103515245 + 12345) >>> 0) / 4294967296);
+  let differ = 0;
+  for (let t = 0; t < 3000; t++) {
+    const b = C.makeBoard(8, 16);
+    for (let i = 0; i < b.length; i++) {
+      if (rand() < 0.6) b[i] = { color: (rand() * 3) | 0, type: rand() < 0.2 ? 'clog' : 'segment', link: null };
+    }
+    const a = [...C.findMatches(b)].sort().join(), o = [...oldMatches(b)].sort().join();
+    if (a !== o) differ++;
+  }
+  eq('without chrome the matcher is unchanged on 3000 random boards', differ, 0);
+
+  // Rows, read left to right along the bottom. S is chrome.
+  const code = { R: 3, B: 4, T: 0, S: C.WILD };
+  const row = (str) => {
+    const b = C.makeBoard(8, 16);
+    [...str].forEach((ch, c) => { if (ch !== '.') b[C.idx(b, c, 15)] = { color: code[ch], type: 'segment', link: null }; });
+    return [...C.findMatches(b)].map((i) => C.colOf(b, i)).sort((x, y) => x - y).join('');
+  };
+  eq('chrome cannot bridge two short runs', row('RRSBB'), '');
+  eq('chrome completes a run', row('RRRSB'), '0123');
+  eq('chrome completes the runs on both sides', row('RRRSBBB'), '0123456');
+  eq('four chrome halves are not a run', row('SSSS'), '');
+  eq('chrome with one real colour is', row('SSSR'), '0123');
+  eq('chrome can alternate', row('RSRS'), '0123');
+  eq('chrome does not merge different colours', row('RSBR'), '');
+
+  // A chrome run treats clogs as any run would.
+  const b = C.makeBoard(8, 16);
+  const put = (c, color, type, matted) => { b[C.idx(b, c, 15)] = { color, type, link: null }; if (matted) b[C.idx(b, c, 15)].matted = true; };
+  put(0, 0, 'segment'); put(1, C.WILD, 'segment'); put(2, 0, 'clog'); put(3, 0, 'clog', true);
+  const got = C.clearMatches(b, C.findMatches(b));
+  eq('a chrome run clears a plain clog', got.clogs, 1);
+  eq('and only strips a matted one', got.stripped, 1);
+
+  // Dealing.
+  eq('no chrome before its level', C.chromeChance(C.CHROME_FROM - 1), 0);
+  check('chrome from its level', C.chromeChance(C.CHROME_FROM) > 0);
+  check('more of it with more colours',
+    C.chromeChance(C.FIFTH_FROM) > C.chromeChance(C.FOURTH_FROM) &&
+    C.chromeChance(C.FOURTH_FROM) > C.chromeChance(C.CHROME_FROM));
+  // mulberry32: the little LCG above is too correlated draw-to-draw for a rate.
+  let ms = 12345;
+  const good = () => { ms |= 0; ms = ms + 0x6D2B79F5 | 0; let t = Math.imul(ms ^ ms >>> 15, 1 | ms);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  let wilds = 0, doubles = 0;
+  for (let t = 0; t < 20000; t++) {
+    const pair = C.randomColors(good, 5, C.chromeChance(C.FIFTH_FROM));
+    const w = pair.filter((x) => x === C.WILD).length;
+    if (w) wilds++;
+    if (w === 2) doubles++;
+  }
+  eq('a coupling never has two chrome halves', doubles, 0);
+  check('chrome turns up at about its rate', Math.abs(wilds / 20000 - C.chromeChance(C.FIFTH_FROM)) < 0.01,
+    String(wilds / 20000));
+  let m2 = 3;
+  const r2 = () => ((m2 = (m2 * 1103515245 + 12345) >>> 0) / 4294967296);
+  let m3 = 3;
+  const r3 = () => ((m3 = (m3 * 1103515245 + 12345) >>> 0) / 4294967296);
+  eq('with no chrome chance the dealt sequence is unchanged',
+    JSON.stringify(Array.from({ length: 50 }, () => C.randomColors(r2, 3))),
+    JSON.stringify(Array.from({ length: 50 }, () => C.randomColors(r3, 3, 0))));
+  for (const level of [C.CHROME_FROM, C.FIFTH_FROM, C.MAX_LEVEL]) {
+    const built = C.seedLevel(level, rand);
+    check('level ' + level + ' seeds no chrome',
+      !built.board.some((c) => c && c.color === C.WILD) && !built.pending.includes(C.WILD));
+  }
+}
+
 /* ---------------------------------------------------------------- report */
 if (failures.length) {
   console.error('FAILED (' + failures.length + ' of ' + (passed + failures.length) + ')');

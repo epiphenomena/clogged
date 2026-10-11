@@ -67,6 +67,17 @@ to the top — each one announced on the level it first turns up:
   every third coupling once there are four. The level picker says how many
   colours a level uses.
 
+Some help arrives too:
+
+- **Chrome universal couplings.** From level 9, now and then one half of a
+  coupling comes up chrome, and chrome matches any colour: it joins whatever
+  run it lands in, and can complete a run on each side of it at once (red red
+  red, chrome, blue blue blue clears all seven). A run still needs one real
+  colour, so four chrome halves are not a free clear, and chrome never turns up
+  on a clog. It is dealt more often the more colours there are: about one
+  coupling in fourteen with three colours, one in ten with four, one in seven
+  with five.
+
 The screen between levels tells the story of the household whose drain this
 is, and each new thing is introduced there with its own chapter. The title,
 pause and win screens have a Share button that copies the game's link.
