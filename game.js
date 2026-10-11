@@ -143,9 +143,56 @@
     },
     // A thick descending glug.
     fanfare: function () {
-      if (!this.init()) return;
+      if (this.muted || !this.ctx) return;
       [523, 659, 784, 1047, 784, 1047, 1319].forEach(function (f, i) {
         Sound.tone(f, i === 6 ? 0.5 : 0.14, 'triangle', 0.09, 0.9 + i * 0.12);
+      });
+    },
+    // A real toilet flush, built from filtered noise: the handle's clunk, the
+    // rush as the cistern empties, a swirl that drops in pitch as the bowl
+    // drains, and a gurgle at the end. Played for a three-plunger clear.
+    toiletFlush: function (delay) {
+      var ctx = this.ctx;
+      if (this.muted || !ctx || !ctx.createBuffer || !ctx.createBiquadFilter) return;
+      var t0 = ctx.currentTime + (delay || 0);
+      var len = 2.6;
+      var buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * len), ctx.sampleRate);
+      var data = buf.getChannelData(0);
+      // Brown-ish noise: water is mostly low rumble, not hiss.
+      var last = 0;
+      for (var i = 0; i < data.length; i++) {
+        last = (last + 0.06 * (Math.random() * 2 - 1)) / 1.06;
+        data[i] = last * 3.2;
+      }
+      var src = ctx.createBufferSource();
+      src.buffer = buf;
+      var band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.Q.setValueAtTime(0.9, t0);
+      band.frequency.setValueAtTime(500, t0);
+      band.frequency.linearRampToValueAtTime(1400, t0 + 0.45);   // the rush
+      band.frequency.linearRampToValueAtTime(900, t0 + 1.2);
+      band.frequency.exponentialRampToValueAtTime(220, t0 + 2.4); // draining away
+      // The swirl: a slow wobble on the filter as the water spins round.
+      var lfo = ctx.createOscillator();
+      var depth = ctx.createGain();
+      lfo.frequency.setValueAtTime(5, t0);
+      lfo.frequency.linearRampToValueAtTime(2.5, t0 + 2.4);
+      depth.gain.setValueAtTime(260, t0);
+      lfo.connect(depth).connect(band.frequency);
+      var gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.5, t0 + 0.12);
+      gain.gain.setValueAtTime(0.5, t0 + 0.9);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+      src.connect(band).connect(gain).connect(ctx.destination);
+      src.start(t0);
+      src.stop(t0 + len);
+      lfo.start(t0);
+      lfo.stop(t0 + len);
+      this.tone(95, 0.08, 'square', 0.08, delay);             // the handle
+      [0, 0.16, 0.3].forEach(function (d, k) {                // the gurgle
+        Sound.sweep(420 - k * 70, 120, 0.14, 'sine', 0.06, (delay || 0) + 2.05 + d);
       });
     },
     sludge: function () {
@@ -1253,7 +1300,7 @@
     box.setAttribute('data-earned', String(award.won));
     box.setAttribute('aria-label', award.won + ' of 3 plungers');
     $('clear-award-line').textContent = award.line;
-    if (award.won === 3) Sound.fanfare();
+    if (award.won === 3) Sound.toiletFlush(1.0);   // after the level's own whoosh
   }
 
   function levelCleared() {
