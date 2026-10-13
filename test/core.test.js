@@ -891,62 +891,69 @@ function lcg(seed) {
   const early = C.seedLevel(C.DYE_FROM - 1, rand);
   check('no dyed clogs before their level', !early.board.some((c) => c && c.dye !== undefined));
 
-  // Stepping: a dyed clog changes after its countdown, then back again.
+  // Stepping: a dyed clog flips every coupling, back and forth.
+  eq('it flips every coupling', C.DYE_EVERY, 1);
   const b = C.makeBoard(8, 16);
-  C.placeClog(b, 3, 15, 0, false, { color: 1, inPieces: 2 });
+  C.placeClog(b, 3, 15, 0, false, { color: 1, inPieces: 1 });
   const at = () => b[C.idx(b, 3, 15)];
-  C.dyeStep(b);
-  eq('it waits out its countdown', at().color, 0);
-  eq('it changes on time', (C.dyeStep(b), at().color), 1);
+  eq('it flips when a coupling lands', (C.dyeStep(b), at().color), 1);
   eq('and remembers the colour to go back to', at().dye, 0);
-  eq('and restarts its countdown', at().dyeIn, C.DYE_EVERY);
-  for (let k = 0; k < C.DYE_EVERY; k++) C.dyeStep(b);
-  eq('it changes back', at().color, 0);
+  eq('and flips back on the next', (C.dyeStep(b), at().color), 0);
 
-  // A change that would complete a run waits instead.
+  // A flip may complete a line: that is how it matches either colour.
   const w = C.makeBoard(8, 16);
   [0, 1, 2].forEach((c) => { w[C.idx(w, c, 15)] = { color: 1, type: 'segment', link: null }; });
   C.placeClog(w, 3, 15, 0, false, { color: 1, inPieces: 1 });
+  eq('no line before the flip', C.findMatches(w).size, 0);
   C.dyeStep(w);
-  eq('a change never completes a run by itself', w[C.idx(w, 3, 15)].color, 0);
-  w[C.idx(w, 0, 15)] = null;
-  C.dyeStep(w);
-  eq('it goes ahead once it would not', w[C.idx(w, 3, 15)].color, 1);
-  // Chrome counts as a match for that rule too.
-  const x = C.makeBoard(8, 16);
-  [0, 1].forEach((c) => { x[C.idx(x, c, 15)] = { color: 1, type: 'segment', link: null }; });
-  x[C.idx(x, 2, 15)] = { color: C.WILD, type: 'segment', link: null };
-  C.placeClog(x, 3, 15, 0, false, { color: 1, inPieces: 1 });
-  C.dyeStep(x);
-  eq('nor with chrome', x[C.idx(x, 3, 15)].color, 0);
-
+  eq('the flip completes the line', C.findMatches(w).size, 4);
   eq('the copy keeps the dye', C.cloneBoard(b)[C.idx(b, 3, 15)].dye, at().dye);
   check('dye eases in like matting', C.easeFor(C.DYE_FROM) > 0);
-  check('and raises par a little', C.parPills(C.DYE_FROM + 2) / C.clogTotal(C.DYE_FROM + 2) >
-    C.parPills(C.DYE_FROM - 1) / C.clogTotal(C.DYE_FROM - 1));
 }
 
 /* ------------------------------------------------------------ drain snake */
 {
+  const seg = (b, c, r, color, link) => { b[C.idx(b, c, r)] = { color: color, type: 'segment', link: link || null }; };
+  // A line of five along row 15, columns 1-5, with things either side.
   const b = C.makeBoard(8, 16);
-  const seg = (c, r, link) => { b[C.idx(b, c, r)] = { color: 1, type: 'segment', link: link || null }; };
-  seg(2, 10, 'right'); seg(3, 10, 'left');   // a lying coupling across the column
-  seg(2, 12);
-  C.placeClog(b, 2, 13, 0, true);             // matted
-  C.placeClog(b, 2, 15, 2);
-  const snake = Object.assign(C.spawnSnake(b), { c: 2, r: 8 });
-  eq('the snake is one cell', C.pieceCells(snake).length, 1);
-  eq('it does not turn', C.tryRotate(b, snake, 1), null);
-  eq('it keeps its kind as it moves', C.tryMove(b, snake, 0, 1).kind, 'snake');
-  eq('it lands on the stack', C.dropDistance(b, snake), 1);
-  const bore = [...C.snakeBore(b, Object.assign({}, snake, { r: 9 }))].map((i) => C.rowOf(b, i)).join();
-  eq('it bores through loose pipe to the first clog and stops there', bore, '10,12,13');
-  const got = C.clearMatches(b, C.snakeBore(b, Object.assign({}, snake, { r: 9 })));
-  eq('a matted clog it reaches is only stripped', got.stripped, 1);
-  eq('the coupling it cut is split, not left dangling', b[C.idx(b, 3, 10)].link, null);
-  check('the clog below the first is untouched', b[C.idx(b, 2, 15)] && b[C.idx(b, 2, 15)].type === 'clog');
-  const empty = C.makeBoard(8, 16);
-  eq('an empty column bores nothing', C.snakeBore(empty, Object.assign(C.spawnSnake(empty), { r: 15 })).size, 0);
+  for (let c = 1; c <= 5; c++) seg(b, c, 15, 0);
+  C.placeClog(b, 0, 15, 2);
+  seg(b, 6, 15, 1, 'up'); seg(b, 6, 14, 1, 'down');
+  C.placeClog(b, 7, 15, 2, true);
+  const runs = C.findRuns(b);
+  eq('one run found', runs.length, 1);
+  eq('it is the whole line, in order', runs[0].cells.map((i) => C.colOf(b, i)).join(), '1,2,3,4,5');
+  eq('along a row', runs[0].axis, 'row');
+  eq('no snake before its level', C.snakeStrike(b, C.SNAKE_FROM - 1).hits.size, 0);
+  const s = C.snakeStrike(b, C.SNAKE_FROM);
+  eq('it breaks out to both walls', [...s.hits].map((i) => C.colOf(b, i)).sort().join(), '0,6,7');
+  eq('two paths, one from each end', s.paths.length, 2);
+  eq('the right path runs from the line to the wall', s.paths[1].cells.map((i) => C.colOf(b, i)).join(), '6,7');
+  const got = C.clearMatches(b, new Set([...C.findMatches(b), ...s.hits]));
+  eq('a matted clog in its way is only stripped', got.stripped, 1);
+  eq('the clog in its way is flushed', got.clogs, 1);
+  eq('the coupling it cut is split', b[C.idx(b, 6, 14)].link, null);
+
+  // Four in a line sends no snake; a column of five sends it up and down.
+  const f = C.makeBoard(8, 16);
+  for (let c = 0; c < 4; c++) seg(f, c, 15, 0);
+  C.placeClog(f, 6, 15, 1);
+  eq('four sends no snake', C.snakeStrike(f, 20).hits.size, 0);
+  const v = C.makeBoard(8, 16);
+  for (let r = 8; r < 13; r++) seg(v, 3, r, 2);
+  C.placeClog(v, 3, 15, 0);
+  C.placeClog(v, 3, 2, 1);
+  const vs = C.snakeStrike(v, 20);
+  eq('a column snake goes up and down', [...vs.hits].map((i) => C.rowOf(v, i)).sort((a, b) => a - b).join(), '2,15');
+  eq('its paths reach both ends of the pipe', vs.paths.map((p) => C.rowOf(v, p.cells[p.cells.length - 1])).sort((a, b) => a - b).join(), '0,15');
+  // A run that ends at a wall has nowhere to go that way.
+  const e = C.makeBoard(8, 16);
+  for (let c = 0; c < 5; c++) seg(e, c, 15, 1);
+  eq('a line against the wall sends one snake', C.snakeStrike(e, 20).paths.length, 1);
+  // Chrome between two runs: each counted once, neither five.
+  const x = C.makeBoard(8, 16);
+  [0, 1, 2].forEach((c) => seg(x, c, 15, 0)); seg(x, 3, 15, C.WILD); [4, 5, 6].forEach((c) => seg(x, c, 15, 1));
+  eq('chrome serves two runs', C.findRuns(x).length, 2);
 }
 
 /* ---------------------------------------------------------------- report */

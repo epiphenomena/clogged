@@ -12,6 +12,7 @@
   var LOCK_DELAY = 320;   // grace period to slide a landed coupling
   var MAX_LOCK_RESETS = 8;
   var CLEAR_MS = 260;     // dissolve animation
+  var SNAKE_CELL_MS = 55; // a drain snake's pace along the pipe, per cell
   var SETTLE_MS = 52;     // per row of post-clear gravity
   var DRIP_MS = 34;       // per row of a clog washing down the pipe
   var TAP_MS = 280;       // a press shorter than this, that barely moved, is a tap
@@ -307,8 +308,9 @@
     challenge: false,     // the mode of the run being played
     plungers: 0,          // efficiency awards won so far this run
     dyeDue: false,        // a coupling landed; dyed clogs count it once settled
-    snakeNext: false,     // a drain snake is waiting in NEXT
-    snakeEarned: false,   // this level's snake has been earned (one a level)
+    snakes: null,         // drain snakes out from a line of five, while clearing
+    clearDelay: null,     // per-cell wait before it dissolves (the snake reaching it)
+    clearDur: 0,
     score: 0,
     best: Store.get('best', 0),
     chain: 0,
@@ -828,6 +830,39 @@
   // flanges at a glance on a small screen.
   var glintT = 0;
 
+  // Drain snakes on their way out from a line of five: a steel cable from the
+  // line's end to a coil with its bit pointing the way it goes.
+  function drawSnakes() {
+    if (!S.snakes) return;
+    var ctx = bctx, s = view.cell, W = view.cols;
+    var reach = S.clearTimer / SNAKE_CELL_MS;
+    S.snakes.forEach(function (path) {
+      var fc = path.from % W, fr = (path.from / W) | 0;
+      var last = path.cells.length - 1;
+      var k = Math.min(reach, last + 1);
+      var dc = (path.cells[0] % W) - fc, dr = ((path.cells[0] / W) | 0) - fr;
+      var hx = view.x0 + (fc + dc * k + 0.5) * s, hy = view.y0 + (fr + dr * k + 0.5) * s;
+      var fade = reach > last + 2 ? Math.max(0, 1 - (reach - last - 2) / 3) : 1;
+      if (fade <= 0) return;
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#5f6b80';
+      ctx.lineWidth = Math.max(2, s * 0.16);
+      ctx.beginPath();
+      ctx.moveTo(view.x0 + (fc + 0.5) * s, view.y0 + (fr + 0.5) * s);
+      ctx.lineTo(hx, hy);
+      ctx.stroke();
+      ctx.strokeStyle = '#d7dee9';
+      ctx.lineWidth = Math.max(1, s * 0.06);
+      ctx.stroke();
+      ctx.translate(hx, hy);
+      ctx.rotate(Math.atan2(dr, dc) - Math.PI / 2);
+      drawSnake(ctx, -s / 2, -s / 2, s);
+      ctx.restore();
+    });
+  }
+
   // The drain snake: a steel coil with a hooked bit at the bottom, drawn live.
   function drawSnake(ctx, x, y, s) {
     var cx = x + s / 2;
@@ -855,43 +890,26 @@
     ctx.restore();
   }
 
-  // A dyed clog shows only the colour it is now, so there is one colour to
-  // match. White pips count the couplings left before it changes; on the
-  // last one a streak of the colour to come flashes across it.
-  function dyeMark(ctx, x, y, s, next, left) {
+  // A dyed clog is its colour now with a bold streak of the other one, the
+  // colour it flips to when the next coupling lands (and back on the one
+  // after), so a glance shows both colours it can match.
+  function dyeMark(ctx, x, y, s, other) {
+    var P = PALETTE[other];
     var cx = x + s / 2;
-    var n = Math.max(1, Math.min(C.DYE_EVERY, left));
-    var r = Math.max(1.5, s * 0.075), gap = r * 2.7;
     ctx.save();
-    if (left <= 1) {
-      var P = PALETTE[next];
-      var flash = reduceMotion ? 1 : 0.65 + 0.35 * Math.sin(glintT * 0.012);
-      ctx.globalAlpha = flash;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x + s * 0.2, y + s * 0.6);
-      ctx.quadraticCurveTo(cx, y + s * 0.12, x + s * 0.8, y + s * 0.34);
-      ctx.lineWidth = Math.max(3, s * 0.24);
-      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-      ctx.stroke();
-      ctx.lineWidth = Math.max(2, s * 0.17);
-      ctx.strokeStyle = P.main;
-      ctx.stroke();
-      ctx.lineWidth = Math.max(1, s * 0.06);
-      ctx.strokeStyle = P.light;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-    ctx.lineWidth = Math.max(1, s * 0.025);
-    for (var k = 0; k < n; k++) {
-      var px = cx + (k - (n - 1) / 2) * gap;
-      ctx.beginPath();
-      ctx.arc(px, y + s * 0.8, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x + s * 0.2, y + s * 0.62);
+    ctx.quadraticCurveTo(cx, y + s * 0.12, x + s * 0.8, y + s * 0.34);
+    ctx.lineWidth = Math.max(3, s * 0.24);
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.stroke();
+    ctx.lineWidth = Math.max(2, s * 0.17);
+    ctx.strokeStyle = P.main;
+    ctx.stroke();
+    ctx.lineWidth = Math.max(1, s * 0.06);
+    ctx.strokeStyle = P.light;
+    ctx.stroke();
     ctx.restore();
   }
   function glint(ctx, x, y, s) {
@@ -934,7 +952,7 @@
   function drawBoard() {
     var ctx = bctx, s = view.cell;
     var clearing = S.clearSet;
-    var p = clearing ? Math.min(1, S.clearTimer / CLEAR_MS) : 0;
+    var delay = S.clearDelay;
 
     for (var i = 0; i < S.board.length; i++) {
       var cell = S.board[i];
@@ -945,11 +963,13 @@
         ? clogSprite(cell.color, i)
         : segSprite(cell.color, cell.link);
 
-      if (!clearing || !clearing.has(i)) {
+      var wait = delay && delay.has(i) ? delay.get(i) : 0;
+      var p = clearing ? Math.min(1, Math.max(0, S.clearTimer - wait) / CLEAR_MS) : 0;
+      if (!clearing || !clearing.has(i) || p === 0) {
         blit(ctx, sprite, x, y, s);
         if (cell.matted) blit(ctx, matSprite(cell.color), x, y, s);
         if (cell.color === C.WILD) glint(ctx, x, y, s);
-        if (cell.dye !== undefined) dyeMark(ctx, x, y, s, cell.dye, cell.dyeIn);
+        if (cell.dye !== undefined) dyeMark(ctx, x, y, s, cell.dye);
         continue;
       }
 
@@ -999,17 +1019,7 @@
     ctx.restore();
 
     var dist = C.dropDistance(S.board, S.piece);
-    if (S.piece.kind === 'snake') {
-      // Show exactly what the snake will take out where it would land.
-      var landed = { c: S.piece.c, r: S.piece.r + dist, kind: 'snake' };
-      ctx.save();
-      C.snakeBore(S.board, landed).forEach(function (i) {
-        var at = cellXY(i % view.cols, (i / view.cols) | 0);
-        ctx.fillStyle = 'rgba(226,232,240,0.22)';
-        ctx.fillRect(at.x + 1, at.y + 1, s - 2, s - 2);
-      });
-      ctx.restore();
-    } else if (dist > 0) {
+    if (dist > 0) {
       ctx.save();
       ctx.globalAlpha = 0.38;
       cells.forEach(function (cl) {
@@ -1027,7 +1037,6 @@
     cells.forEach(function (cl) {
       if (cl.r < 0) return;
       var pos = cellXY(cl.c, cl.r);
-      if (cl.snake) { drawSnake(ctx, pos.x, pos.y, s); return; }
       blit(ctx, segSprite(cl.color, cl.link), pos.x, pos.y, s);
       if (cl.color === C.WILD) glint(ctx, pos.x, pos.y, s);
     });
@@ -1064,7 +1073,7 @@
 
     blit(ctx, clogSprite(d.color, d.col + d.target), view.x0 + d.col * sz, y, sz);
     if (d.matted) blit(ctx, matSprite(d.color), view.x0 + d.col * sz, y, sz);
-    if (d.dye) dyeMark(ctx, view.x0 + d.col * sz, y, sz, d.dye.color, d.dye.inPieces);
+    if (d.dye) dyeMark(ctx, view.x0 + d.col * sz, y, sz, d.dye.color);
   }
 
   function drawToast() {
@@ -1104,7 +1113,6 @@
   function drawNext() {
     var ctx = nctx;
     ctx.clearRect(0, 0, 48, 24);
-    if (S.snakeNext) { drawSnake(ctx, 12, 0, 24); return; }
     if (!S.nextColors) return;
     var s = 24;
     blit(ctx, segSprite(S.nextColors[0], 'right'), 0, 0, s);
@@ -1341,6 +1349,7 @@
     bctx.rect(view.x0, view.y0, view.cols * view.cell, view.rows * view.cell);
     bctx.clip();
     drawBoard();
+    drawSnakes();
     drawPiece();
     drawDrip(t);
     drawHint();
@@ -1393,9 +1402,7 @@
       locks: S.locks,
       recorded: S.recorded,
       challenge: S.challenge,
-      plungers: S.plungers,
-      snakeNext: S.snakeNext,
-      snakeEarned: S.snakeEarned
+      plungers: S.plungers
     }));
   }
 
@@ -1441,6 +1448,8 @@
     if (!keepScore) { S.score = 0; S.plungers = 0; }
     S.chain = 0;
     S.clearSet = null;
+    S.clearDelay = null;
+    S.snakes = null;
     S.toast = null;
     S.fx = null;
     document.body.classList.remove('fx-active');
@@ -1448,8 +1457,6 @@
     S.pressure = 0;
     S.locks = 0;
     S.hint = 1;
-    S.snakeNext = false;
-    S.snakeEarned = false;
     S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level, S.challenge), C.chromeChance(S.level, S.challenge));
     hideAllOverlays();
     spawn();
@@ -1463,20 +1470,14 @@
     else if (level === C.fourthFrom(S.challenge)) toast('A FOURTH COLOUR', PALETTE[3].light);
     else if (level === C.FIFTH_FROM) toast('A FIFTH COLOUR', PALETTE[4].light);
     else if (level === C.CHROME_FROM) toast('CHROME FITS ANY COLOUR', '#ffffff');
-    else if (level === C.DYE_FROM) toast('DYED CLOGS CHANGE COLOUR', '#f9c7ff');
-    else if (level === C.SNAKE_FROM) toast('CHAIN x3 EARNS A DRAIN SNAKE', '#e2e8f0');
+    else if (level === C.DYE_FROM) toast('DYED CLOGS FLIP EVERY PILL', '#f9c7ff');
+    else if (level === C.SNAKE_FROM) toast('A LINE OF 5 SENDS A DRAIN SNAKE', '#e2e8f0');
   }
 
   function spawn() {
-    if (S.snakeNext) {
-      // The snake jumps the queue; the coupling shown before it comes after.
-      S.piece = C.spawnSnake(S.board);
-      S.snakeNext = false;
-    } else {
-      S.piece = C.spawnPiece(S.board, S.nextColors);
-      S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level, S.challenge),
-        C.chromeChance(S.level, S.challenge));
-    }
+    S.piece = C.spawnPiece(S.board, S.nextColors);
+    S.nextColors = C.randomColors(Math.random, C.colorsFor(S.level, S.challenge),
+      C.chromeChance(S.level, S.challenge));
     drawNext();
     S.fallTimer = 0;
     S.lockPending = false;
@@ -1566,6 +1567,26 @@
 
   function beginClear(hits) {
     S.chain++;
+    // A line of five or more sends drain snakes out from its ends to the
+    // walls; each cell they break goes as the snake reaches it.
+    var strike = C.snakeStrike(S.board, S.level);
+    S.clearDelay = null;
+    S.snakes = null;
+    S.clearDur = CLEAR_MS;
+    if (strike.paths.length) {
+      hits = new Set(hits);
+      S.clearDelay = new Map();
+      strike.paths.forEach(function (path) {
+        path.cells.forEach(function (i, k) {
+          if (!strike.hits.has(i) || hits.has(i)) return;
+          hits.add(i);
+          S.clearDelay.set(i, (k + 1) * SNAKE_CELL_MS);
+        });
+        S.clearDur = Math.max(S.clearDur, (path.cells.length + 1) * SNAKE_CELL_MS + CLEAR_MS);
+      });
+      S.snakes = strike.paths;
+      Sound.snake();
+    }
     var clogs = 0, segments = 0, stripped = 0;
     hits.forEach(function (i) {
       var cell = S.board[i];
@@ -1579,15 +1600,9 @@
     var gained = Math.round((clogs * 100 + stripped * 50 + segments * 10) * mult);
     S.score += gained;
 
-    var earned = S.chain >= C.SNAKE_CHAIN && S.level >= C.SNAKE_FROM && !S.snakeEarned;
     toast((S.chain > 1 ? 'CHAIN x' + S.chain + '  ' : '') + '+' + gained
-      + (earned ? '  · DRAIN SNAKE!' : ''),
+      + (S.snakes ? '  · DRAIN SNAKE!' : ''),
       S.chain > 1 ? '#ffdf9a' : '#9ff6ea');
-    if (earned) {
-      S.snakeEarned = true;
-      S.snakeNext = true;
-      drawNext();
-    }
     S.clearSet = hits;
     S.clearTimer = 0;
     S.shake = Math.min(7, 2 + S.chain * 1.5);
@@ -1621,18 +1636,21 @@
     if (hits.size) { beginClear(hits); return; }
     if (S.pending.length && S.sinceDrip >= C.dripEvery(S.level, S.challenge) && startDrip()) return;
     if (clogsLeft() === 0) { levelCleared(); return; }
-    // Once the landing has fully settled, dyed clogs count the coupling.
+    // Once the landing has fully settled, dyed clogs flip, and a flip can
+    // finish a line.
     if (S.dyeDue) {
       S.dyeDue = false;
-      if (C.dyeStep(S.board)) Sound.dye();
+      if (C.dyeStep(S.board)) {
+        Sound.dye();
+        var flipped = C.findMatches(S.board);
+        if (flipped.size) { beginClear(flipped); return; }
+      }
     }
     spawn();
   }
 
   function lockNow() {
-    var snake = S.piece.kind === 'snake';
-    var bore = snake ? C.snakeBore(S.board, S.piece) : null;
-    if (!snake) C.lockPiece(S.board, S.piece);
+    C.lockPiece(S.board, S.piece);
     S.piece = null;
     S.lockPending = false;
     S.shake = 2.5;
@@ -1642,13 +1660,6 @@
     S.dyeDue = true;
     if (S.locks >= 3) S.hint = Math.min(S.hint, 0.6);
     S.chain = 0;
-    if (snake) {
-      Sound.snake();
-      if (bore.size) { beginClear(bore); return; }
-      S.phase = 'settling';
-      S.settleTimer = 0;
-      return;
-    }
     Sound.lock();
 
     var hits = C.findMatches(S.board);
@@ -1703,9 +1714,11 @@
       }
     } else if (S.phase === 'clearing') {
       S.clearTimer += dt;
-      if (S.clearTimer >= CLEAR_MS) {
+      if (S.clearTimer >= S.clearDur) {
         C.clearMatches(S.board, S.clearSet);
         S.clearSet = null;
+        S.clearDelay = null;
+        S.snakes = null;
         S.phase = 'settling';
         S.settleTimer = 0;
         refreshHUD();
@@ -2221,10 +2234,10 @@
     S.recorded = saved.recorded;
     S.challenge = saved.challenge;
     S.plungers = saved.plungers;
-    S.snakeNext = saved.snakeNext;
-    S.snakeEarned = saved.snakeEarned;
     S.chain = 0;
     S.clearSet = null;
+    S.clearDelay = null;
+    S.snakes = null;
     S.drip = null;
     S.toast = null;
     S.fx = null;

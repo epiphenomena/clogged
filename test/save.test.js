@@ -289,22 +289,17 @@ function sampleGame() {
   check('a dyed clog missing its dye is refused', !S.decode(short, LIMITS));
 }
 
-// A drain snake in flight, in NEXT, or already used this level, survives.
+// A save from the builds with a hand-aimed drain snake still loads: the snake
+// in flight is dropped and a fresh coupling spawns instead.
 {
-  const g = sampleGame();
-  g.piece = { c: 3, r: 2, orient: 0, colors: null, kind: 'snake' };
-  g.snakeNext = false;
-  g.snakeEarned = true;
-  const back = S.decode(S.encode(g), LIMITS);
-  eq('a snake in flight survives', back.piece.kind, 'snake');
-  eq('where it was', back.piece.c + ',' + back.piece.r, '3,2');
-  eq('the level has had its snake', back.snakeEarned, true);
-  const n = sampleGame();
-  n.snakeNext = true;
-  eq('a snake waiting in next survives', S.decode(S.encode(n), LIMITS).snakeNext, true);
-  eq('an old save has no snake', S.decode(S.encode(sampleGame()), LIMITS).snakeNext, false);
-  const bad = S.encode(g);
-  bad.piece[5] = 2;
+  const raw = S.encode(sampleGame());
+  raw.piece = [3, 2, 0, 0, 0, 1];
+  raw.sn = 1; raw.se = 1;
+  const back = S.decode(raw, LIMITS);
+  check('an old snake save still loads', !!back);
+  eq('its snake is dropped', back && back.piece, null);
+  const bad = S.encode(sampleGame());
+  bad.piece = [3, 2, 0, 0, 0, 2];
   check('an unknown piece kind is refused', !S.decode(bad, LIMITS));
 }
 

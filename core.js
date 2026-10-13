@@ -280,7 +280,6 @@
   /* ---------------------------------------------------------------- pieces */
 
   function pieceCells(p) {
-    if (p.kind === 'snake') return [{ c: p.c, r: p.r, color: null, link: null, snake: true }];
     var off = OFFSETS[p.orient];
     var link = LINKS[p.orient];
     return [
@@ -307,7 +306,6 @@
       orient: orient === undefined ? p.orient : orient,
       colors: p.colors
     };
-    if (p.kind) next.kind = p.kind;
     return next;
   }
 
@@ -357,7 +355,6 @@
   }
 
   function tryRotate(board, p, dir) {
-    if (p.kind === 'snake') return null;   // one cell: nothing to turn
     var orient = (p.orient + (dir > 0 ? 1 : 3)) % 4;
     var kicks = kicksFor(p, orient);
     for (var i = 0; i < kicks.length; i++) {
@@ -390,29 +387,77 @@
 
   /* ---------------------------------------------------------- drain snake */
 
-  // A chain of SNAKE_CHAIN or better earns a drain snake, once a level, from
-  // SNAKE_FROM. It is a one-cell piece, aimed like any other. Where it lands it
-  // bores straight down its column: every loose bit of pipe below it goes, and
-  // the first clog it reaches is flushed (or, if matted, stripped). Returns the
-  // cells to clear, for clearMatches; nothing is placed on the board.
+  // From SNAKE_FROM, a line of SNAKE_RUN or more sends out a drain snake. It
+  // starts at the line's ends and bores straight on along it to the walls,
+  // breaking every bit of pipe and every clog in its way (a matted clog loses
+  // its mat, as in any flush).
   var SNAKE_FROM = 6;
-  var SNAKE_CHAIN = 3;
+  var SNAKE_RUN = 5;
 
-  function snakeBore(board, p) {
-    var W = dims(board).w, H = board.h;
-    var hits = new Set();
-    for (var r = p.r + 1; r < H; r++) {
-      var at = r * W + p.c;
-      var cell = board[at];
-      if (!cell) continue;
-      hits.add(at);
-      if (cell.type === 'clog') break;
+  // Every maximal run on the board, as { cells, axis } with cells in order
+  // along the line. Same rule as findMatches; chrome between two runs belongs
+  // to both.
+  function findRuns(board, min) {
+    min = min || MIN_RUN;
+    var d = dims(board), W = d.w, H = d.h;
+    var runs = [];
+    function scan(cells, axis) {
+      var lastEnd = -1;
+      for (var i = 0; i < cells.length; i++) {
+        if (!board[cells[i]]) continue;
+        var m = ALL_COLORS, real = false, j = i;
+        while (j < cells.length && board[cells[j]]) {
+          var mm = m & colorMask(board[cells[j]]);
+          if (!mm) break;
+          m = mm;
+          if (board[cells[j]].color !== WILD) real = true;
+          j++;
+        }
+        if (j - i >= min && real && j !== lastEnd) {
+          runs.push({ cells: cells.slice(i, j), axis: axis });
+          lastEnd = j;
+        }
+      }
     }
-    return hits;
+    var r, c, line;
+    for (r = 0; r < H; r++) {
+      line = [];
+      for (c = 0; c < W; c++) line.push(r * W + c);
+      scan(line, 'row');
+    }
+    for (c = 0; c < W; c++) {
+      line = [];
+      for (r = 0; r < H; r++) line.push(r * W + c);
+      scan(line, 'col');
+    }
+    return runs;
   }
 
-  function spawnSnake(board) {
-    return { c: (dims(board).w >> 1) - 1, r: 0, orient: 0, colors: null, kind: 'snake' };
+  // The snakes a board's lines send out: for each line of SNAKE_RUN or more,
+  // a path from each end out to the wall. Returns { hits, paths }: the
+  // occupied cells the snakes break, and each path as the cell indices it
+  // crosses in order (empty ones too, for drawing).
+  function snakeStrike(board, level) {
+    var hits = new Set(), paths = [];
+    if ((level || 0) < SNAKE_FROM) return { hits: hits, paths: paths };
+    var d = dims(board), W = d.w, H = d.h;
+    findRuns(board).forEach(function (run) {
+      if (run.cells.length < SNAKE_RUN) return;
+      var first = run.cells[0], last = run.cells[run.cells.length - 1];
+      [[first, -1], [last, 1]].forEach(function (end) {
+        var dc = run.axis === 'row' ? end[1] : 0;
+        var dr = run.axis === 'col' ? end[1] : 0;
+        var path = [];
+        for (var c = end[0] % W + dc, r = ((end[0] / W) | 0) + dr;
+          c >= 0 && c < W && r >= 0 && r < H; c += dc, r += dr) {
+          var at = r * W + c;
+          path.push(at);
+          if (board[at]) hits.add(at);
+        }
+        if (path.length) paths.push({ from: end[0], cells: path, axis: run.axis });
+      });
+    });
+    return { hits: hits, paths: paths };
   }
 
   function spawnPiece(board, colors) {
@@ -635,13 +680,11 @@
   /* ------------------------------------------------------------ hair dye */
 
   // From level 13 some clogs are dyed: they carry a second colour and swap to
-  // it every DYE_EVERY couplings, then back. A ring in the colour to come warns
-  // of it, and pulses on the last coupling before the change. A clog is never
-  // both dyed and matted. A change never completes a run on its own (it would
-  // flush the clog for free and set off a cascade between pieces), so a clog
-  // whose change would do that waits until it would not.
+  // it every time a coupling lands, then back, so in effect it matches either
+  // colour: a line that wants the other one clears a pill later, when it
+  // flips. A clog is never both dyed and matted.
   var DYE_FROM = 13;
-  var DYE_EVERY = 4;
+  var DYE_EVERY = 1;
   var DYE_BASE = 0.12;
   var DYE_PER_LEVEL = 0.005;
   var DYE_MAX = 0.25;
@@ -651,7 +694,7 @@
     return Math.min(DYE_MAX, DYE_BASE + (level - DYE_FROM) * DYE_PER_LEVEL);
   }
 
-  // The second colour and a staggered first countdown, or null. Draws nothing
+  // The second colour and the countdown to its first flip, or null. Draws nothing
   // from rand below DYE_FROM, so earlier levels seed exactly as before.
   function rollDye(level, color, colors, rand) {
     var share = dyeShare(level);
@@ -662,9 +705,9 @@
   }
 
   // One coupling has landed: every dyed clog counts down, and those at zero
-  // change colour if they can. Returns how many changed.
+  // flip to their other colour. A flip may complete a line; the caller looks
+  // for matches afterwards. Returns how many changed.
   function dyeStep(board) {
-    dims(board);
     var changed = 0;
     for (var i = 0; i < board.length; i++) {
       var cell = board[i];
@@ -673,10 +716,6 @@
       if (cell.dyeIn > 0) continue;
       var was = cell.color;
       cell.color = cell.dye;
-      if (findMatches(board).has(i)) {   // the matcher, so chrome counts too
-        cell.color = was;   // not yet: try again after the next coupling
-        continue;
-      }
       cell.dye = was;
       cell.dyeIn = DYE_EVERY;
       changed++;
@@ -830,8 +869,7 @@
   var PAR_TWO_PLUNGERS = 2;   // times par
 
   function parPills(level, challenge) {
-    // A dyed clog costs a little extra: half the time it changes under you.
-    var work = clogTotal(level, challenge) * (1 + mattedShare(level) + dyeShare(level) / 2);
+    var work = clogTotal(level, challenge) * (1 + mattedShare(level));
     return Math.round(work * PAR_PILLS_PER_CLOG *
       colorsFor(level, challenge) / BASE_COLORS + PAR_SLACK);
   }
@@ -886,8 +924,8 @@
     dripLanding: dripLanding, dripColumn: dripColumn, placeClog: placeClog,
     dripTarget: dripTarget,
     parPills: parPills, plungersFor: plungersFor,
-    SNAKE_FROM: SNAKE_FROM, SNAKE_CHAIN: SNAKE_CHAIN, snakeBore: snakeBore,
-    spawnSnake: spawnSnake,
+    SNAKE_FROM: SNAKE_FROM, SNAKE_RUN: SNAKE_RUN, findRuns: findRuns,
+    snakeStrike: snakeStrike,
     DYE_FROM: DYE_FROM, DYE_EVERY: DYE_EVERY, dyeShare: dyeShare, rollDye: rollDye,
     dyeStep: dyeStep,
     easeFor: easeFor, introductions: introductions, EASE_LEVELS: EASE_LEVELS,

@@ -76,15 +76,15 @@
         'seen empty space they couldn\'t fill.'
     ];
     s[C.SNAKE_FROM] = [
-      'You finally bought a proper drain snake. Pull off a chain of three or ' +
-        'more and one turns up in NEXT, once a level: drop it down a column ' +
-        'and it bores through loose pipe to flush the first clog it hits.',
-      'New tool day: a drain snake. A chain of three or more earns one, once ' +
-        'a level. Aim it at a column and it chews down through the pipe and ' +
-        'flushes the first clog it reaches.',
-      'The Pipers\' drain has earned the big guns: a drain snake. Make a ' +
-        'chain of three or more and it is yours, once a level. Drop it in a ' +
-        'column; it bores down and flushes the first clog in its way.'
+      'You finally bought a proper drain snake. Line up five or more in a ' +
+        'row and it shoots out of both ends of the line to the walls, ' +
+        'breaking every clog and bit of pipe in its way.',
+      'New tool day: a drain snake. Make a line of five and it bursts out ' +
+        'from the ends of the line, straight on to the walls, chewing ' +
+        'through everything it meets.',
+      'The Pipers\' drain has earned the big guns: a drain snake. A line of ' +
+        'five or more sends it out of both ends, all the way to the walls, ' +
+        'and nothing in its way survives.'
     ];
     s[C.CHROME_FROM] = [
       'Good news for once: the supply shop had chrome universal couplings on ' +
@@ -99,16 +99,14 @@
     ];
     s[C.DYE_FROM] = [
       'The Pipers\' teenager dyes their hair a new colour every week, and ' +
-        'every week it goes down the drain. A dyed clog matches the colour ' +
-        'it is now; its white pips count the couplings until it changes, ' +
-        'and a streak of the new colour flashes just before.',
+        'every week it goes down the drain. A dyed clog wears a streak of ' +
+        'a second colour and flips to it every pill, so it matches either.',
       'Hair dye season. The teenager rinses out a new colour every week. ' +
-        'Match a dyed clog by the colour it is now. The pips count down ' +
-        'the couplings to its change; a flashing streak shows what is next.',
+        'Dyed clogs flip between their colour and their streak every pill: ' +
+        'line up either one, and if it is the streak, it clears a pill later.',
       'The teenager went from blonde to "sunset" to "galaxy" in a month, ' +
-        'all of it via the drain. Dyed clogs change colour every few ' +
-        'couplings. Go by the colour they are now, count the pips, and ' +
-        'watch for the flashing streak of the colour to come.'
+        'all of it via the drain. A dyed clog flips to its streak colour ' +
+        'every pill and back again, so either colour will flush it.'
     ];
     s[C.MATTED_FROM] = [
       'Congratulations — the Pipers have a new baby! Somebody ' +

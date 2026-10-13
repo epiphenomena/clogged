@@ -54,12 +54,11 @@ the pipe has stopped growing, so three more things keep the difficulty climbing
 to the top — each one announced on the level it first turns up:
 
 - **Some clogs are dyed.** From level 13 (the teenager's weekly hair dye) a
-  share of clogs, about one in eight rising to one in four, carry a second
-  colour and swap to it every four couplings, then back. A dyed clog shows
-  only the colour it is now — the one to match — with white pips counting the
-  couplings left; on the last one a streak of the colour to come flashes
-  across it. A change never completes a run by itself — the clog waits instead —
-  and a clog is never both dyed and matted.
+  share of clogs, about one in eight rising to one in four, carry a bold
+  streak of a second colour and flip to it every time a coupling lands, then
+  back on the next. In effect a dyed clog matches either colour: line up its
+  streak colour and the line clears a pill later, when it flips. A clog is
+  never both dyed and matted.
 - **Some clogs are matted.** From level 17 a share of the hairballs — arrivals
   included — come bound in a double braided collar.
   A line through one only strips the mat off (for half a clog's points) and
@@ -76,12 +75,10 @@ to the top — each one announced on the level it first turns up:
 
 Some help arrives too:
 
-- **The drain snake.** From level 6, a chain of three or more earns a drain
-  snake, once a level. It jumps the queue into NEXT, and is aimed like any
-  coupling (it does not turn). Where it lands it bores straight down its
-  column: every loose bit of pipe below it goes, and the first clog it reaches
-  is flushed — or, if matted, stripped. A faint highlight shows exactly what it
-  will take out before you drop it.
+- **The drain snake.** From level 6, a line of five or more sends a drain
+  snake out of both ends of the line, straight on to the walls (up and down
+  for a column). It breaks every bit of pipe and every clog in its way — a
+  matted clog just loses its mat — and every one counts toward the score.
 - **Chrome universal couplings.** From level 9, now and then one half of a
   coupling comes up chrome, and chrome matches any colour: it joins whatever
   run it lands in, and can complete a run on each side of it at once (red red

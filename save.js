@@ -47,9 +47,7 @@
         }
         return [cell.color, cell.type !== 'clog' ? 0 : cell.matted ? 2 : 1, cell.link || 0];
       }),
-      // A drain snake has no colours; it is flagged by a sixth element.
       piece: !game.piece ? null
-        : game.piece.kind === 'snake' ? [game.piece.c, game.piece.r, 0, 0, 0, 1]
         : [game.piece.c, game.piece.r, game.piece.orient,
            game.piece.colors[0], game.piece.colors[1]],
       next: [game.next[0], game.next[1]],
@@ -60,9 +58,7 @@
       locks: game.locks,
       recorded: !!game.recorded,
       c: game.challenge ? 1 : 0,
-      pl: game.plungers || 0,
-      sn: game.snakeNext ? 1 : 0,
-      se: game.snakeEarned ? 1 : 0
+      pl: game.plungers || 0
     };
   }
 
@@ -120,8 +116,9 @@
       if (!isInt(p[0], 0, cols - 1) || !isInt(p[1], 0, rows - 1)) return null;
       if (!isInt(p[2], 0, 3)) return null;
       if (!pieceColor(p[3]) || !pieceColor(p[4])) return null;
-      piece = p.length === 6
-        ? { c: p[0], r: p[1], orient: 0, colors: null, kind: 'snake' }
+      // A six-element piece is a drain snake from the builds where it was aimed
+      // by hand; it is dropped, and a fresh coupling spawns in its place.
+      piece = p.length === 6 ? null
         : { c: p[0], r: p[1], orient: p[2], colors: [p[3], p[4]] };
     }
 
@@ -159,9 +156,7 @@
       recorded: !!raw.recorded,
       challenge: raw.c === 1,
       // Older saves predate the efficiency award, so they start the tally at 0.
-      plungers: isInt(raw.pl, 0, 3 * (limits.maxLevel + 1)) ? raw.pl : 0,
-      snakeNext: raw.sn === 1,
-      snakeEarned: raw.se === 1
+      plungers: isInt(raw.pl, 0, 3 * (limits.maxLevel + 1)) ? raw.pl : 0
     };
   }
 
