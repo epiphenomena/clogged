@@ -154,132 +154,103 @@
         Sound.tone(f, i === 6 ? 0.5 : 0.14, 'triangle', 0.09, 0.9 + i * 0.12);
       });
     },
-    // A toilet flush, built the way water sounds: a broadband roar of
-    // filtered noise that wavers at random rather than wobbling, hundreds of
-    // tiny bubbles chirping upward, the clank of the handle, the slurp as the
-    // bowl empties, big low bubbles gulping after it, and the cistern hissing
-    // as it refills. Played for a three-plunger clear.
-    toiletFlush: function (delay) {
+    // A plunger at work, then the drain giving way: two plunges, each a wet
+    // rubbery squelch going down and a sucking slurp coming up, the seal
+    // popping free on the last, and a run of gurgles as the water goes. The
+    // squelch is a low buzzing sawtooth with a wobbly pitch through a
+    // resonant filter sweeping like a mouth; wet noise rides along with it.
+    // Played for a three-plunger clear.
+    plunge: function (delay) {
       var ctx = this.ctx;
       if (this.muted || !ctx || !ctx.createBuffer || !ctx.createBiquadFilter) return;
       var t0 = ctx.currentTime + (delay || 0);
-      var len = 4.2;
       var rate = ctx.sampleRate;
-      var buf = ctx.createBuffer(1, Math.floor(rate * len), rate);
+      var buf = ctx.createBuffer(1, Math.floor(rate * 1.5), rate);
       var data = buf.getChannelData(0);
-      // Pink noise (Paul Kellet's filter): the hiss and splash of moving water.
-      var b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-      for (var i = 0; i < data.length; i++) {
-        var w = Math.random() * 2 - 1;
-        b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759;
-        b2 = 0.96900 * b2 + w * 0.1538520; b3 = 0.86650 * b3 + w * 0.3104856;
-        b4 = 0.55000 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.0168980;
-        data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
-        b6 = w * 0.115926;
-      }
-      var WANDER = 1.6;
+      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
       var out = ctx.createGain();
-      out.gain.setValueAtTime(0.9, t0);
+      out.gain.setValueAtTime(0.55, t0);
       out.connect(ctx.destination);
-      function noise(at, dur, offset) {
-        var src = ctx.createBufferSource();
-        src.buffer = buf;
-        src.start(at, offset || 0, dur);
-        return src;
+
+      function env(g, at, dur, vol) {
+        g.gain.setValueAtTime(0, at);
+        g.gain.linearRampToValueAtTime(vol, at + 0.025);
+        g.gain.setValueAtTime(vol, at + dur * 0.55);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
       }
-      function filter(type, freq, q) {
-        var f = ctx.createBiquadFilter();
-        f.type = type;
-        f.frequency.setValueAtTime(freq, t0);
-        f.Q.setValueAtTime(q, t0);
-        return f;
+      // One squelch: pitch and filter each sweep from a to b over dur.
+      function squelch(at, dur, f0a, f0b, fca, fcb, vol) {
+        var osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(f0a, at);
+        osc.frequency.exponentialRampToValueAtTime(f0b, at + dur);
+        // The wobble: slow noise nudging the pitch, so it flubs, not hums.
+        var wob = ctx.createBufferSource();
+        wob.buffer = buf;
+        var wl = ctx.createBiquadFilter();
+        wl.type = 'lowpass';
+        wl.frequency.setValueAtTime(40, at);
+        var wg = ctx.createGain();
+        wg.gain.setValueAtTime(f0a * 1.6, at);
+        wob.connect(wl).connect(wg).connect(osc.frequency);
+        var lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.Q.setValueAtTime(9, at);
+        lp.frequency.setValueAtTime(fca, at);
+        lp.frequency.exponentialRampToValueAtTime(fcb, at + dur);
+        var g = ctx.createGain();
+        env(g, at, dur, vol);
+        osc.connect(lp).connect(g).connect(out);
+        // Wet noise through the same moving band.
+        var wet = ctx.createBufferSource();
+        wet.buffer = buf;
+        var bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.Q.setValueAtTime(2.5, at);
+        bp.frequency.setValueAtTime(fca * 1.4, at);
+        bp.frequency.exponentialRampToValueAtTime(fcb * 1.4, at + dur);
+        var ng = ctx.createGain();
+        env(ng, at, dur, vol * 0.7);
+        wet.connect(bp).connect(ng).connect(out);
+        osc.start(at); osc.stop(at + dur + 0.02);
+        wob.start(at, Math.random() * 1.2, dur + 0.02);
+        wet.start(at, Math.random() * 1.2, dur + 0.02);
       }
-
-      // The handle: a metal clank and a thunk in the cistern.
-      var clank = filter('bandpass', 2600, 6);
-      var cg = ctx.createGain();
-      cg.gain.setValueAtTime(0.0001, t0);
-      cg.gain.exponentialRampToValueAtTime(1.2, t0 + 0.004);
-      cg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
-      noise(t0, 0.1, 1.3).connect(clank).connect(cg).connect(out);
-      this.tone(1870, 0.12, 'triangle', 0.03, delay);
-      this.sweep(150, 55, 0.1, 'sine', 0.12, delay);
-
-      // The roar: the cistern dumping into the bowl.
-      var t1 = t0 + 0.12;
-      var hp = filter('highpass', 220, 0.7);
-      var body = filter('peaking', 900, 0.8);
-      body.gain.setValueAtTime(8, t0);
-      body.frequency.setValueAtTime(700, t1);
-      body.frequency.linearRampToValueAtTime(1700, t1 + 0.35);
-      body.frequency.linearRampToValueAtTime(1100, t1 + 1.5);
-      body.frequency.exponentialRampToValueAtTime(450, t1 + 2.4);
-      var lp = filter('lowpass', 7000, 0.5);
-      lp.frequency.setValueAtTime(7000, t1 + 1.3);
-      lp.frequency.exponentialRampToValueAtTime(1200, t1 + 2.5);
-      var roar = ctx.createGain();
-      roar.gain.setValueAtTime(0.0001, t1);
-      roar.gain.exponentialRampToValueAtTime(0.55, t1 + 0.18);
-      roar.gain.setValueAtTime(0.55, t1 + 1.4);
-      roar.gain.setTargetAtTime(0, t1 + 1.4, 0.3);
-      // Turbulence: the roar's level wanders a few times a second.
-      var turb = ctx.createGain();
-      turb.gain.setValueAtTime(1, t0);
-      noise(t1, 2.6, 0).connect(hp).connect(body).connect(lp).connect(roar)
-        .connect(turb).connect(out);
-      var wander = filter('lowpass', 9, 0.7);
-      var wg = ctx.createGain();
-      wg.gain.setValueAtTime(WANDER, t0);
-      noise(t1, 2.6, 0.7).connect(wander).connect(wg).connect(turb.gain);
-
-      // Bubbles: each a sine that rises as it pops, small and high while the
-      // water churns, bigger and lower as it drains.
-      function bubble(at, f, dur, vol, attack) {
+      // A bubble: a sine that rises as it pops.
+      function bubble(at, f, dur, vol) {
         var o = ctx.createOscillator();
         var g = ctx.createGain();
         o.type = 'sine';
         o.frequency.setValueAtTime(f, at);
-        o.frequency.exponentialRampToValueAtTime(f * (1.5 + Math.random() * 0.6), at + dur);
-        g.gain.setValueAtTime(0.0001, at);
-        g.gain.exponentialRampToValueAtTime(vol, at + (attack || 0.004));
+        o.frequency.exponentialRampToValueAtTime(f * 1.8, at + dur);
+        g.gain.setValueAtTime(0, at);
+        g.gain.linearRampToValueAtTime(vol, at + 0.015);
         g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
         o.connect(g).connect(out);
-        o.start(at);
-        o.stop(at + dur + 0.01);
-      }
-      for (var k = 0; k < 90; k++) {
-        var u = Math.pow(Math.random(), 1.3);       // more of them early on
-        var at = t1 + 0.05 + u * 2.0;
-        var f = (1 - u * 0.6) * (700 + Math.random() * 2300);
-        bubble(at, f, 0.02 + Math.random() * 0.04, 0.012 + Math.random() * 0.03);
+        o.start(at); o.stop(at + dur + 0.02);
       }
 
-      // The slurp as the bowl empties: noise sucked down through a narrowing
-      // band, swelling then cut off.
-      var t2 = t1 + 1.5;
-      var suck = filter('bandpass', 1400, 2.5);
-      suck.frequency.setValueAtTime(1400, t2);
-      suck.frequency.exponentialRampToValueAtTime(260, t2 + 0.6);
-      var sg = ctx.createGain();
-      sg.gain.setValueAtTime(0.0001, t2);
-      sg.gain.exponentialRampToValueAtTime(2.6, t2 + 0.4);
-      sg.gain.exponentialRampToValueAtTime(0.0001, t2 + 0.65);
-      noise(t2, 0.7, 2.0).connect(suck).connect(sg).connect(out);
-
-      // The gulp: a few big low bubbles as the air goes down after it.
-      [0, 0.11, 0.19, 0.34, 0.42].forEach(function (d, n) {
-        bubble(t2 + 0.55 + d, 170 + Math.random() * 160 - n * 15,
-          0.08 + Math.random() * 0.05, 0.08, 0.02);
+      // Two plunges: down (the pitch and the mouth both closing), then up
+      // (opening, sucking).
+      [0, 0.62].forEach(function (d, n) {
+        squelch(t0 + d, 0.24, 95, 60, 1300, 380, 0.5);
+        squelch(t0 + d + 0.3, 0.22, 55, 120 + n * 30, 300, 1500, 0.42);
       });
+      // The seal pops free.
+      var tp = t0 + 1.16;
+      bubble(tp, 520, 0.07, 0.35);
+      Sound.sweep(900, 260, 0.06, 'sine', 0.12, tp - ctx.currentTime);
 
-      // The cistern refilling: a quiet hiss that fades out.
-      var t3 = t2 + 0.7;
-      var fill = filter('bandpass', 4200, 1.2);
-      var fg = ctx.createGain();
-      fg.gain.setValueAtTime(0.0001, t3);
-      fg.gain.exponentialRampToValueAtTime(0.12, t3 + 0.25);
-      fg.gain.exponentialRampToValueAtTime(0.0001, t3 + 1.4);
-      noise(t3, 1.4, 0.2).connect(fill).connect(fg).connect(out);
+      // The gurgles: bubbles in an uneven run, getting bigger and lower as
+      // the drain clears, ending in a couple of deep glugs.
+      var tg = t0 + 1.35, f = 520;
+      for (var k = 0; k < 11; k++) {
+        bubble(tg, f * (0.85 + Math.random() * 0.3), 0.07 + k * 0.007, 0.32);
+        tg += 0.045 + Math.random() * 0.06;
+        f *= 0.9;
+      }
+      bubble(tg + 0.08, 150, 0.16, 0.5);
+      bubble(tg + 0.26, 115, 0.18, 0.5);
     },
     // The snake boring down: a fast descending rattle.
     snake: function () {
@@ -1529,7 +1500,7 @@
     box.setAttribute('data-earned', String(award.won));
     box.setAttribute('aria-label', award.won + ' of 3 plungers');
     $('clear-award-line').textContent = award.line;
-    if (award.won === 3) Sound.toiletFlush(1.0);   // after the level's own whoosh
+    if (award.won === 3) Sound.plunge(1.0);   // after the level's own whoosh
   }
 
   function levelCleared() {
